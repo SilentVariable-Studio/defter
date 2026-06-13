@@ -6,25 +6,24 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>Defter</title>
   <style>
-    /* ---- Genel ayarlar ---- */
+    /* ---- Renkler (sıcak "defter/kağıt" teması) ---- */
     :root {
-      --bg: #f4f6f8;
-      --kart: #ffffff;
-      --ana: #2563eb;      /* canlı mavi */
-      --ana-soft: #eff4ff;
-      --yesil: #16a34a;    /* kazanç */
-      --kirmizi: #dc2626;  /* alacak / borç */
-      --metin: #1f2937;
-      --soluk: #6b7280;
-      --cizgi: #eceff3;
+      --krem: #FAEEDA;       /* sıcak krem zemin */
+      --kart: #ffffff;       /* beyaz kartlar */
+      --kahve-koyu: #412402; /* başlık */
+      --kahve: #854F0B;      /* alt başlık / ücret etiketi yazısı */
+      --amber: #BA7517;      /* buton */
+      --yesil: #0F6E56;      /* kazanç / borcu yok */
+      --kirmizi: #A32D2D;    /* alacak / borç */
+      --soluk: #9b8a73;      /* öğrenci kartı küçük gri-kahve yazı */
     }
 
     * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
 
     body {
       margin: 0;
-      background: var(--bg);
-      color: var(--metin);
+      background: var(--krem);
+      color: var(--kahve-koyu);
       font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
       /* Telefonda tek elle okunacak ölçek */
       font-size: 16px;
@@ -33,23 +32,27 @@
 
     /* Sayfayı telefon genişliğinde ortalı tut */
     .ekran {
-      max-width: 480px;
+      max-width: 460px;
       margin: 0 auto;
       min-height: 100vh;
-      padding: 16px 16px 32px;
+      padding: 20px 18px 36px;
     }
 
     .baslik {
-      margin: 8px 4px 18px;
+      margin: 6px 4px 22px;
     }
     .baslik h1 {
-      font-size: 24px;
+      /* Serif yazı tipi sıcaklık katar */
+      font-family: Georgia, "Times New Roman", "Cambria", serif;
+      font-size: 38px;
       margin: 0;
       font-weight: 700;
+      letter-spacing: 0.5px;
+      color: var(--kahve-koyu);
     }
     .baslik p {
       margin: 4px 0 0;
-      color: var(--soluk);
+      color: var(--kahve);
       font-size: 14px;
     }
 
@@ -57,14 +60,14 @@
     .ozet {
       display: flex;
       gap: 12px;
-      margin-bottom: 22px;
+      margin-bottom: 26px;
     }
     .kart {
       flex: 1;
       background: var(--kart);
-      border-radius: 16px;
+      border-radius: 14px;
       padding: 16px;
-      box-shadow: 0 2px 8px rgba(0,0,0,0.05);
+      box-shadow: 0 2px 10px rgba(65, 36, 2, 0.06);
     }
     .kart .etiket {
       font-size: 13px;
@@ -72,27 +75,27 @@
       margin-bottom: 8px;
     }
     .kart .deger {
-      font-size: 22px;
+      font-size: 23px;
       font-weight: 700;
     }
     .kart.kazanc .deger { color: var(--yesil); }
     .kart.alacak .deger { color: var(--kirmizi); }
 
-    /* ---- Öğrenci listesi ---- */
+    /* ---- Öğrenci kartları ---- */
     .liste-baslik {
-      font-size: 14px;
-      color: var(--soluk);
-      margin: 0 4px 10px;
+      font-size: 13px;
+      color: var(--kahve);
+      margin: 0 4px 12px;
       text-transform: uppercase;
-      letter-spacing: 0.5px;
+      letter-spacing: 0.6px;
     }
 
     .ogrenci {
       background: var(--kart);
-      border-radius: 16px;
-      padding: 14px 16px;
+      border-radius: 14px;
+      padding: 16px;
       margin-bottom: 12px;
-      box-shadow: 0 2px 8px rgba(0,0,0,0.05);
+      box-shadow: 0 2px 10px rgba(65, 36, 2, 0.06);
     }
     .ogrenci .ust {
       display: flex;
@@ -102,46 +105,53 @@
     }
     .ogrenci .ad {
       font-size: 18px;
-      font-weight: 600;
+      font-weight: 700;
+      color: var(--kahve-koyu);
     }
+    /* Ücret etiketi: krem zemin, kahve yazı, hap şekli */
     .ogrenci .ucret {
       font-size: 13px;
-      color: var(--ana);
-      background: var(--ana-soft);
-      padding: 4px 10px;
+      color: var(--kahve);
+      background: var(--krem);
+      padding: 5px 12px;
       border-radius: 999px;
       white-space: nowrap;
     }
 
-    /* Alt satır: ders / ödenen / kalan */
+    /* Alt satır: küçük gri yazı, üç bilgi yan yana */
     .ogrenci .alt {
       display: flex;
-      gap: 8px;
-    }
-    .ogrenci .hucre {
-      flex: 1;
-      text-align: center;
-      padding: 8px 4px;
-      background: var(--bg);
-      border-radius: 12px;
-    }
-    .ogrenci .hucre .k-etiket {
-      font-size: 11px;
+      gap: 6px;
+      font-size: 13px;
       color: var(--soluk);
-      margin-bottom: 2px;
     }
-    .ogrenci .hucre .k-deger {
-      font-size: 15px;
+    .ogrenci .alt span { white-space: nowrap; }
+    .ogrenci .alt .ayrac { opacity: 0.5; }
+    .ogrenci .alt .kaldi.borc { color: var(--kirmizi); font-weight: 600; }
+    .ogrenci .alt .kaldi.temiz { color: var(--yesil); font-weight: 600; }
+
+    /* ---- Öğrenci ekle butonu (şimdilik sadece görüntü) ---- */
+    .ekle-btn {
+      display: block;
+      width: 100%;
+      margin-top: 8px;
+      padding: 16px;
+      border: none;
+      border-radius: 14px;
+      background: var(--amber);
+      color: #ffffff;
+      font-size: 16px;
       font-weight: 600;
+      cursor: pointer;
+      box-shadow: 0 3px 10px rgba(186, 117, 23, 0.30);
     }
-    .ogrenci .hucre.kalan .k-deger { color: var(--kirmizi); }
-    .ogrenci .hucre.kalan.temiz .k-deger { color: var(--yesil); }
+    .ekle-btn:active { transform: translateY(1px); }
 
     .dipnot {
       text-align: center;
       color: var(--soluk);
       font-size: 12px;
-      margin-top: 18px;
+      margin-top: 20px;
     }
   </style>
 </head>
@@ -165,9 +175,12 @@
     </div>
 
     <div class="liste-baslik">Öğrenciler</div>
-    <div id="liste"><!-- Öğrenci satırları buraya yazılır --></div>
+    <div id="liste"><!-- Öğrenci kartları buraya yazılır --></div>
 
-    <div class="dipnot">Aşağıdakiler örnek verilerdir</div>
+    <!-- Şimdilik sadece görüntü; işlevi sonraki adımda gelecek -->
+    <button class="ekle-btn" type="button">+ Öğrenci ekle</button>
+
+    <div class="dipnot">Yukarıdakiler örnek verilerdir</div>
   </div>
 
   <script>
@@ -198,7 +211,7 @@
       toplamKazanc += o.odenen;
       toplamAlacak += kalan;
 
-      var temizMi = kalan <= 0 ? " temiz" : "";
+      var kaldiSinif = kalan > 0 ? "borc" : "temiz";
 
       listeHtml +=
         '<div class="ogrenci">' +
@@ -207,18 +220,11 @@
             '<div class="ucret">' + para(o.ucret) + ' / ders</div>' +
           '</div>' +
           '<div class="alt">' +
-            '<div class="hucre">' +
-              '<div class="k-etiket">Ders</div>' +
-              '<div class="k-deger">' + o.dersSayisi + '</div>' +
-            '</div>' +
-            '<div class="hucre">' +
-              '<div class="k-etiket">Ödenen</div>' +
-              '<div class="k-deger">' + para(o.odenen) + '</div>' +
-            '</div>' +
-            '<div class="hucre kalan' + temizMi + '">' +
-              '<div class="k-etiket">Kalan</div>' +
-              '<div class="k-deger">' + para(kalan > 0 ? kalan : 0) + '</div>' +
-            '</div>' +
+            '<span>' + o.dersSayisi + ' ders</span>' +
+            '<span class="ayrac">·</span>' +
+            '<span>' + para(o.odenen) + ' ödendi</span>' +
+            '<span class="ayrac">·</span>' +
+            '<span class="kaldi ' + kaldiSinif + '">' + para(kalan > 0 ? kalan : 0) + ' kaldı</span>' +
           '</div>' +
         '</div>';
     });
