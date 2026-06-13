@@ -1,0 +1,231 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+  <meta charset="UTF-8" />
+  <!-- Telefon ekranına göre ölçeklenmesi için -->
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Defter</title>
+  <style>
+    /* ---- Genel ayarlar ---- */
+    :root {
+      --bg: #f4f6f8;
+      --kart: #ffffff;
+      --ana: #2563eb;      /* canlı mavi */
+      --ana-soft: #eff4ff;
+      --yesil: #16a34a;    /* kazanç */
+      --kirmizi: #dc2626;  /* alacak / borç */
+      --metin: #1f2937;
+      --soluk: #6b7280;
+      --cizgi: #eceff3;
+    }
+
+    * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+
+    body {
+      margin: 0;
+      background: var(--bg);
+      color: var(--metin);
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+      /* Telefonda tek elle okunacak ölçek */
+      font-size: 16px;
+      line-height: 1.4;
+    }
+
+    /* Sayfayı telefon genişliğinde ortalı tut */
+    .ekran {
+      max-width: 480px;
+      margin: 0 auto;
+      min-height: 100vh;
+      padding: 16px 16px 32px;
+    }
+
+    .baslik {
+      margin: 8px 4px 18px;
+    }
+    .baslik h1 {
+      font-size: 24px;
+      margin: 0;
+      font-weight: 700;
+    }
+    .baslik p {
+      margin: 4px 0 0;
+      color: var(--soluk);
+      font-size: 14px;
+    }
+
+    /* ---- Özet kartları ---- */
+    .ozet {
+      display: flex;
+      gap: 12px;
+      margin-bottom: 22px;
+    }
+    .kart {
+      flex: 1;
+      background: var(--kart);
+      border-radius: 16px;
+      padding: 16px;
+      box-shadow: 0 2px 8px rgba(0,0,0,0.05);
+    }
+    .kart .etiket {
+      font-size: 13px;
+      color: var(--soluk);
+      margin-bottom: 8px;
+    }
+    .kart .deger {
+      font-size: 22px;
+      font-weight: 700;
+    }
+    .kart.kazanc .deger { color: var(--yesil); }
+    .kart.alacak .deger { color: var(--kirmizi); }
+
+    /* ---- Öğrenci listesi ---- */
+    .liste-baslik {
+      font-size: 14px;
+      color: var(--soluk);
+      margin: 0 4px 10px;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+    }
+
+    .ogrenci {
+      background: var(--kart);
+      border-radius: 16px;
+      padding: 14px 16px;
+      margin-bottom: 12px;
+      box-shadow: 0 2px 8px rgba(0,0,0,0.05);
+    }
+    .ogrenci .ust {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 10px;
+    }
+    .ogrenci .ad {
+      font-size: 18px;
+      font-weight: 600;
+    }
+    .ogrenci .ucret {
+      font-size: 13px;
+      color: var(--ana);
+      background: var(--ana-soft);
+      padding: 4px 10px;
+      border-radius: 999px;
+      white-space: nowrap;
+    }
+
+    /* Alt satır: ders / ödenen / kalan */
+    .ogrenci .alt {
+      display: flex;
+      gap: 8px;
+    }
+    .ogrenci .hucre {
+      flex: 1;
+      text-align: center;
+      padding: 8px 4px;
+      background: var(--bg);
+      border-radius: 12px;
+    }
+    .ogrenci .hucre .k-etiket {
+      font-size: 11px;
+      color: var(--soluk);
+      margin-bottom: 2px;
+    }
+    .ogrenci .hucre .k-deger {
+      font-size: 15px;
+      font-weight: 600;
+    }
+    .ogrenci .hucre.kalan .k-deger { color: var(--kirmizi); }
+    .ogrenci .hucre.kalan.temiz .k-deger { color: var(--yesil); }
+
+    .dipnot {
+      text-align: center;
+      color: var(--soluk);
+      font-size: 12px;
+      margin-top: 18px;
+    }
+  </style>
+</head>
+<body>
+  <div class="ekran">
+    <div class="baslik">
+      <h1>Defter</h1>
+      <p>Özel ders kazanç takibi</p>
+    </div>
+
+    <!-- Özet kartları -->
+    <div class="ozet">
+      <div class="kart kazanc">
+        <div class="etiket">Bu ay kazanç</div>
+        <div class="deger" id="ozet-kazanc">—</div>
+      </div>
+      <div class="kart alacak">
+        <div class="etiket">Toplam alacak</div>
+        <div class="deger" id="ozet-alacak">—</div>
+      </div>
+    </div>
+
+    <div class="liste-baslik">Öğrenciler</div>
+    <div id="liste"><!-- Öğrenci satırları buraya yazılır --></div>
+
+    <div class="dipnot">Aşağıdakiler örnek verilerdir</div>
+  </div>
+
+  <script>
+    // =========================================================
+    //  ÖRNEK / GEÇİCİ VERİ
+    //  Bu öğrenciler yalnızca görünümü denemek için elle yazıldı.
+    //  Gerçek veri ve kayıt sonraki adımda gelecek; burası silinecek.
+    // =========================================================
+    var ornekOgrenciler = [
+      { ad: "Ayşe Yılmaz",  ucret: 300, dersSayisi: 8,  odenen: 2400 }, // borcu yok
+      { ad: "Mehmet Demir", ucret: 250, dersSayisi: 6,  odenen: 1000 }, // borcu var
+      { ad: "Elif Kaya",    ucret: 350, dersSayisi: 4,  odenen: 700  }  // borcu var
+    ];
+
+    // Parayı "1.250 ₺" gibi okunaklı yazan küçük yardımcı
+    function para(sayi) {
+      return sayi.toLocaleString("tr-TR") + " ₺";
+    }
+
+    var toplamKazanc = 0; // ödenen toplam (bu ay kazanç olarak gösteriliyor)
+    var toplamAlacak = 0; // kalan borçların toplamı
+
+    var listeHtml = "";
+    ornekOgrenciler.forEach(function (o) {
+      var hakedis = o.ucret * o.dersSayisi; // yapılan derslerin tutarı
+      var kalan = hakedis - o.odenen;        // kalan borç
+
+      toplamKazanc += o.odenen;
+      toplamAlacak += kalan;
+
+      var temizMi = kalan <= 0 ? " temiz" : "";
+
+      listeHtml +=
+        '<div class="ogrenci">' +
+          '<div class="ust">' +
+            '<div class="ad">' + o.ad + '</div>' +
+            '<div class="ucret">' + para(o.ucret) + ' / ders</div>' +
+          '</div>' +
+          '<div class="alt">' +
+            '<div class="hucre">' +
+              '<div class="k-etiket">Ders</div>' +
+              '<div class="k-deger">' + o.dersSayisi + '</div>' +
+            '</div>' +
+            '<div class="hucre">' +
+              '<div class="k-etiket">Ödenen</div>' +
+              '<div class="k-deger">' + para(o.odenen) + '</div>' +
+            '</div>' +
+            '<div class="hucre kalan' + temizMi + '">' +
+              '<div class="k-etiket">Kalan</div>' +
+              '<div class="k-deger">' + para(kalan > 0 ? kalan : 0) + '</div>' +
+            '</div>' +
+          '</div>' +
+        '</div>';
+    });
+
+    document.getElementById("liste").innerHTML = listeHtml;
+    document.getElementById("ozet-kazanc").textContent = para(toplamKazanc);
+    document.getElementById("ozet-alacak").textContent = para(toplamAlacak);
+  </script>
+</body>
+</html>
