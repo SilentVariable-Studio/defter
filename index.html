@@ -451,6 +451,34 @@
     /* "Düzeltme" başlığı, özetin hemen altında ilişkili dursun */
     .durum-ozet .duzelt-baslik { margin-top: 14px; }
 
+    /* ---- Geçmiş dersler listesi (düzenleme penceresi) ---- */
+    .gecmis-dersler { margin-bottom: 16px; }
+    .gecmis-baslik {
+      font-size: 13px;
+      color: var(--kahve);
+      margin-bottom: 8px;
+    }
+    .gecmis-bos {
+      font-size: 13px;
+      color: var(--soluk);
+    }
+    .gecmis-satir {
+      display: flex;
+      justify-content: space-between;
+      align-items: baseline;
+      gap: 12px;
+      font-size: 14px;
+      padding: 7px 0;
+      border-bottom: 1px solid #e6d9c2;
+    }
+    .gecmis-satir:last-child { border-bottom: none; }
+    .gecmis-satir .tarih { color: var(--kahve-koyu); }
+    .gecmis-satir .tarih.yok { color: var(--soluk); font-style: italic; }
+    .gecmis-satir .tutar {
+      color: var(--soluk);
+      white-space: nowrap;
+    }
+
     /* Düzenleme penceresindeki "Öğrenciyi sil" butonu (ayrı dursun) */
     .btn-sil {
       width: 100%;
@@ -661,6 +689,12 @@
         </div>
       </div>
 
+      <!-- Geçmiş dersler: tarih+saatiyle, en yeni en üstte (sadece bilgi) -->
+      <div class="gecmis-dersler">
+        <div class="gecmis-baslik">Geçmiş dersler</div>
+        <div id="d-gecmis-liste"></div>
+      </div>
+
       <!-- Bilgiler -->
       <div class="form-alan">
         <label for="d-ad">Öğrenci adı</label>
@@ -754,6 +788,8 @@
     //      sinif,                  // "5".."12" | "Mezun" | "Diğer" | "" (belirtilmemiş)
     //      guncelDersUcreti,       // yeni dersler bu fiyattan eklenir
     //      dersOlaylari: [tutar, ...],  // her "Ders yapıldı" — sıralı, her ders kendi fiyatıyla
+    //      dersTarihleri: [ISO|null, ...], // her dersin tarih+saati (dersOlaylari ile AYNI sırada/uzunlukta;
+    //                                      // eski/tarihsiz dersler için null). SADECE bilgi; paraya etkisi yok.
     //      odenmisDersSayisi       // en eski derslerden kaçının ödendiği (0 .. dersOlaylari.length)
     //    }
     //  Ödeme, en eski ödenmemiş dersi O DERSİN kendi fiyatından kapatır (güncel ücret değil).
@@ -816,11 +852,19 @@
       if (odenmis < 0) odenmis = 0;
       if (odenmis > dersOlaylari.length) odenmis = dersOlaylari.length;
 
+      // Ders tarihleri: dersOlaylari ile aynı uzunlukta hizala.
+      // Eksik (eski/tarihsiz) dersler null kalır; fazlaysa kırpılır. Paraya dokunmaz.
+      var dersTarihleri = Array.isArray(o.dersTarihleri)
+        ? o.dersTarihleri.slice(0, dersOlaylari.length)
+        : [];
+      while (dersTarihleri.length < dersOlaylari.length) dersTarihleri.push(null);
+
       return {
         ad: o.ad,
         guncelDersUcreti: ucret,
         sinif: sinif,
         dersOlaylari: dersOlaylari,
+        dersTarihleri: dersTarihleri,
         odenmisDersSayisi: odenmis
       };
     }
@@ -1049,6 +1093,7 @@
         guncelDersUcreti: ucret,
         sinif: sinif,
         dersOlaylari: [],
+        dersTarihleri: [], // dersOlaylari ile hizalı kalır
         odenmisDersSayisi: 0
       });
       ogrencileriYaz(ogrenciler); // kalıcı kayıt
@@ -1060,6 +1105,9 @@
     // Olaylar O AN geçerli ders ücretiyle eklenir; geçmiş tutarlar değişmez.
     function dersYapildi(o) {
       o.dersOlaylari.push(o.guncelDersUcreti);
+      // Tarih bilgisi (paraya etkisi yok): dersOlaylari ile aynı sırada/uzunlukta tut
+      if (!Array.isArray(o.dersTarihleri)) o.dersTarihleri = [];
+      o.dersTarihleri.push(new Date().toISOString());
     }
     // En eski ödenmemiş dersi kapatır (tutarı o dersin kendi fiyatıdır).
     // Ödenmemiş ders kalmadıysa hiçbir şey yapmaz.
@@ -1105,7 +1153,44 @@
     var dOzetDers = document.getElementById("d-ozet-ders");
     var dOzetOdeme = document.getElementById("d-ozet-odeme");
     var dOzetKalan = document.getElementById("d-ozet-kalan");
+    var dGecmisListe = document.getElementById("d-gecmis-liste");
     var duzenleIndex = -1; // hangi öğrenci düzenleniyor
+
+    // Bir ISO tarihi okunaklı "GG.AA.YYYY SS:DD" biçimine çevir.
+    // Tarih yoksa/bozuksa null döndür (çağıran "tarih kaydedilmemiş" gösterir).
+    function tarihBicimle(iso) {
+      if (!iso) return null;
+      var d = new Date(iso);
+      if (isNaN(d.getTime())) return null;
+      return d.toLocaleString("tr-TR", {
+        day: "2-digit", month: "2-digit", year: "numeric",
+        hour: "2-digit", minute: "2-digit"
+      });
+    }
+
+    // Geçmiş dersleri tarih+saatiyle listele (en yeni en üstte). Sadece bilgi; paraya etkisi yok.
+    function gecmisDersleriCiz() {
+      var o = ogrenciler[duzenleIndex];
+      if (!o) return;
+      var n = o.dersOlaylari.length;
+      if (n === 0) {
+        dGecmisListe.innerHTML = '<div class="gecmis-bos">Henüz ders işaretlenmedi.</div>';
+        return;
+      }
+      var tarihler = Array.isArray(o.dersTarihleri) ? o.dersTarihleri : [];
+      var html = "";
+      for (var i = n - 1; i >= 0; i--) { // en yeni en üstte
+        var bicim = tarihBicimle(tarihler[i]);
+        var tarihHtml = bicim
+          ? '<span class="tarih">' + kacis(bicim) + '</span>'
+          : '<span class="tarih yok">tarih kaydedilmemiş</span>';
+        html += '<div class="gecmis-satir">' +
+                  tarihHtml +
+                  '<span class="tutar">' + para(o.dersOlaylari[i]) + '</span>' +
+                '</div>';
+      }
+      dGecmisListe.innerHTML = html;
+    }
 
     // Geri alma butonlarını, olay var/yok durumuna göre etkin/pasif yap
     function geriAlButonlariniTazele() {
@@ -1149,6 +1234,7 @@
       dUyari.classList.remove("gorun");
       geriAlButonlariniTazele();
       duzenleOzetTazele();
+      gecmisDersleriCiz(); // geçmiş dersleri tarih+saatiyle göster
       perdeDuzenle.classList.add("acik");
       // Otomatik odaklanma yok: klavye yalnızca kullanıcı alana dokununca açılsın
     }
@@ -1198,6 +1284,7 @@
       var o = ogrenciler[duzenleIndex];
       if (!o || o.dersOlaylari.length === 0) return;
       o.dersOlaylari.pop();
+      if (Array.isArray(o.dersTarihleri)) o.dersTarihleri.pop(); // tarih de tutarlı geri alınsın
       if (o.odenmisDersSayisi > o.dersOlaylari.length) {
         o.odenmisDersSayisi = o.dersOlaylari.length;
       }
@@ -1205,6 +1292,7 @@
       ciz();
       geriAlButonlariniTazele();
       duzenleOzetTazele();
+      gecmisDersleriCiz(); // geçmiş ders listesini de tazele
     }
     // Bir ödemeyi geri al: ödenmiş ders sayısını 1 azaltır; pencere açık kalır
     function odemeGeriAl() {
