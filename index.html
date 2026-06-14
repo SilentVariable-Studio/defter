@@ -2,8 +2,8 @@
 <html lang="tr">
 <head>
   <meta charset="UTF-8" />
-  <!-- Telefon ekranına göre ölçeklenmesi için -->
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <!-- Telefon ekranına göre ölçeklenmesi için; zoom kapalı (uygulama hissi) -->
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
   <title>Defter</title>
 
   <!-- PWA: kurulabilir / çevrimdışı (tüm yollar göreli) -->
@@ -489,7 +489,7 @@
       </div>
       <div class="form-alan">
         <label for="alan-ucret">Ders ücreti (₺)</label>
-        <input type="number" id="alan-ucret" placeholder="Örn. 300" inputmode="numeric" min="0" />
+        <input type="number" id="alan-ucret" placeholder="Örn. 300" inputmode="numeric" min="0" autocomplete="off" />
       </div>
 
       <div class="form-butonlar">
@@ -552,7 +552,7 @@
       </div>
       <div class="form-alan">
         <label for="d-ucret">Ders ücreti (₺)</label>
-        <input type="number" id="d-ucret" inputmode="numeric" min="0" />
+        <input type="number" id="d-ucret" inputmode="numeric" min="0" autocomplete="off" />
         <div class="form-not">Bu ücret yalnızca bundan sonraki derslere uygulanır.</div>
       </div>
 
