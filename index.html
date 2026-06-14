@@ -130,7 +130,18 @@
     .ogrenci .alt .kaldi.borc { color: var(--kirmizi); font-weight: 600; }
     .ogrenci .alt .kaldi.temiz { color: var(--yesil); font-weight: 600; }
 
-    /* ---- Öğrenci ekle butonu (şimdilik sadece görüntü) ---- */
+    /* ---- Boş durum mesajı ---- */
+    .bos-durum {
+      background: var(--kart);
+      border-radius: 14px;
+      padding: 28px 20px;
+      text-align: center;
+      color: var(--soluk);
+      font-size: 15px;
+      box-shadow: 0 2px 10px rgba(65, 36, 2, 0.06);
+    }
+
+    /* ---- Öğrenci ekle butonu ---- */
     .ekle-btn {
       display: block;
       width: 100%;
@@ -153,6 +164,83 @@
       font-size: 12px;
       margin-top: 20px;
     }
+
+    /* ---- Form açılır penceresi ---- */
+    .perde {
+      display: none; /* açılınca flex olacak */
+      position: fixed;
+      inset: 0;
+      background: rgba(65, 36, 2, 0.35);
+      align-items: flex-end;
+      justify-content: center;
+      padding: 0;
+      z-index: 10;
+    }
+    .perde.acik { display: flex; }
+
+    .form-panel {
+      background: var(--kart);
+      width: 100%;
+      max-width: 460px;
+      border-radius: 18px 18px 0 0;
+      padding: 22px 18px calc(22px + env(safe-area-inset-bottom));
+      box-shadow: 0 -4px 20px rgba(65, 36, 2, 0.20);
+    }
+    .form-panel h2 {
+      margin: 0 0 16px;
+      font-size: 20px;
+      color: var(--kahve-koyu);
+    }
+    .form-alan { margin-bottom: 14px; }
+    .form-alan label {
+      display: block;
+      font-size: 13px;
+      color: var(--kahve);
+      margin-bottom: 6px;
+    }
+    .form-alan input {
+      width: 100%;
+      padding: 13px 14px;
+      border: 1px solid #e6d9c2;
+      border-radius: 12px;
+      font-size: 16px;
+      background: #fffdf9;
+      color: var(--kahve-koyu);
+    }
+    .form-alan input:focus {
+      outline: none;
+      border-color: var(--amber);
+    }
+
+    /* Doğrulama uyarısı */
+    .uyari {
+      display: none;
+      background: #fbe9e7;
+      color: var(--kirmizi);
+      font-size: 13px;
+      padding: 10px 12px;
+      border-radius: 10px;
+      margin-bottom: 14px;
+    }
+    .uyari.gorun { display: block; }
+
+    .form-butonlar {
+      display: flex;
+      gap: 10px;
+      margin-top: 4px;
+    }
+    .form-butonlar button {
+      flex: 1;
+      padding: 14px;
+      border: none;
+      border-radius: 12px;
+      font-size: 15px;
+      font-weight: 600;
+      cursor: pointer;
+    }
+    .btn-kaydet { background: var(--amber); color: #fff; }
+    .btn-vazgec { background: var(--krem); color: var(--kahve); }
+    .form-butonlar button:active { transform: translateY(1px); }
   </style>
 </head>
 <body>
@@ -177,61 +265,175 @@
     <div class="liste-baslik">Öğrenciler</div>
     <div id="liste"><!-- Öğrenci kartları buraya yazılır --></div>
 
-    <!-- Şimdilik sadece görüntü; işlevi sonraki adımda gelecek -->
-    <button class="ekle-btn" type="button">+ Öğrenci ekle</button>
+    <button class="ekle-btn" type="button" id="ekle-btn">+ Öğrenci ekle</button>
+  </div>
 
-    <div class="dipnot">Yukarıdakiler örnek verilerdir</div>
+  <!-- Öğrenci ekleme formu (açılır panel) -->
+  <div class="perde" id="perde">
+    <div class="form-panel">
+      <h2>Yeni öğrenci</h2>
+
+      <div class="uyari" id="uyari"></div>
+
+      <div class="form-alan">
+        <label for="alan-ad">Öğrenci adı</label>
+        <input type="text" id="alan-ad" placeholder="Örn. Ayşe Yılmaz" autocomplete="off" />
+      </div>
+      <div class="form-alan">
+        <label for="alan-ucret">Ders ücreti (₺)</label>
+        <input type="number" id="alan-ucret" placeholder="Örn. 300" inputmode="numeric" min="0" />
+      </div>
+
+      <div class="form-butonlar">
+        <button type="button" class="btn-vazgec" id="btn-vazgec">Vazgeç</button>
+        <button type="button" class="btn-kaydet" id="btn-kaydet">Kaydet</button>
+      </div>
+    </div>
   </div>
 
   <script>
     // =========================================================
-    //  ÖRNEK / GEÇİCİ VERİ
-    //  Bu öğrenciler yalnızca görünümü denemek için elle yazıldı.
-    //  Gerçek veri ve kayıt sonraki adımda gelecek; burası silinecek.
+    //  KALICI KAYIT — öğrenciler cihazda localStorage'da saklanır.
+    //  Her öğrenci: { ad, dersUcreti, dersSayisi, odenenToplam }
+    //  Kalan borç = dersSayisi * dersUcreti - odenenToplam
     // =========================================================
-    var ornekOgrenciler = [
-      { ad: "Ayşe Yılmaz",  ucret: 300, dersSayisi: 8,  odenen: 2400 }, // borcu yok
-      { ad: "Mehmet Demir", ucret: 250, dersSayisi: 6,  odenen: 1000 }, // borcu var
-      { ad: "Elif Kaya",    ucret: 350, dersSayisi: 4,  odenen: 700  }  // borcu var
-    ];
+    var DEPO_ANAHTAR = "defter_ogrenciler";
+
+    // Kayıttan öğrencileri oku (yoksa boş liste)
+    function ogrencileriOku() {
+      try {
+        var ham = localStorage.getItem(DEPO_ANAHTAR);
+        return ham ? JSON.parse(ham) : [];
+      } catch (e) {
+        return [];
+      }
+    }
+
+    // Öğrencileri kayda yaz
+    function ogrencileriYaz(liste) {
+      localStorage.setItem(DEPO_ANAHTAR, JSON.stringify(liste));
+    }
+
+    var ogrenciler = ogrencileriOku();
 
     // Parayı "1.250 ₺" gibi okunaklı yazan küçük yardımcı
     function para(sayi) {
       return sayi.toLocaleString("tr-TR") + " ₺";
     }
 
-    var toplamKazanc = 0; // ödenen toplam (bu ay kazanç olarak gösteriliyor)
-    var toplamAlacak = 0; // kalan borçların toplamı
+    // Metni güvenli yazmak için (ad içindeki < > gibi karakterler)
+    function kacis(metin) {
+      return String(metin)
+        .replace(/&/g, "&amp;")
+        .replace(/</g, "&lt;")
+        .replace(/>/g, "&gt;");
+    }
 
-    var listeHtml = "";
-    ornekOgrenciler.forEach(function (o) {
-      var hakedis = o.ucret * o.dersSayisi; // yapılan derslerin tutarı
-      var kalan = hakedis - o.odenen;        // kalan borç
+    // Ekranı (liste + özet kartları) çiz
+    function ciz() {
+      var liste = document.getElementById("liste");
+      var toplamKazanc = 0; // ödenen toplamların toplamı
+      var toplamAlacak = 0; // kalan borçların toplamı
 
-      toplamKazanc += o.odenen;
-      toplamAlacak += kalan;
+      if (ogrenciler.length === 0) {
+        liste.innerHTML =
+          '<div class="bos-durum">Henüz öğrenci yok.<br>Aşağıdaki + Öğrenci ekle ile başla.</div>';
+      } else {
+        var html = "";
+        ogrenciler.forEach(function (o) {
+          var hakedis = o.dersSayisi * o.dersUcreti; // yapılan derslerin tutarı
+          var kalan = hakedis - o.odenenToplam;       // kalan borç
 
-      var kaldiSinif = kalan > 0 ? "borc" : "temiz";
+          toplamKazanc += o.odenenToplam;
+          toplamAlacak += kalan;
 
-      listeHtml +=
-        '<div class="ogrenci">' +
-          '<div class="ust">' +
-            '<div class="ad">' + o.ad + '</div>' +
-            '<div class="ucret">' + para(o.ucret) + ' / ders</div>' +
-          '</div>' +
-          '<div class="alt">' +
-            '<span>' + o.dersSayisi + ' ders</span>' +
-            '<span class="ayrac">·</span>' +
-            '<span>' + para(o.odenen) + ' ödendi</span>' +
-            '<span class="ayrac">·</span>' +
-            '<span class="kaldi ' + kaldiSinif + '">' + para(kalan > 0 ? kalan : 0) + ' kaldı</span>' +
-          '</div>' +
-        '</div>';
+          var kaldiSinif = kalan > 0 ? "borc" : "temiz";
+
+          html +=
+            '<div class="ogrenci">' +
+              '<div class="ust">' +
+                '<div class="ad">' + kacis(o.ad) + '</div>' +
+                '<div class="ucret">' + para(o.dersUcreti) + ' / ders</div>' +
+              '</div>' +
+              '<div class="alt">' +
+                '<span>' + o.dersSayisi + ' ders</span>' +
+                '<span class="ayrac">·</span>' +
+                '<span>' + para(o.odenenToplam) + ' ödendi</span>' +
+                '<span class="ayrac">·</span>' +
+                '<span class="kaldi ' + kaldiSinif + '">' + para(kalan > 0 ? kalan : 0) + ' kaldı</span>' +
+              '</div>' +
+            '</div>';
+        });
+        liste.innerHTML = html;
+      }
+
+      document.getElementById("ozet-kazanc").textContent = para(toplamKazanc);
+      document.getElementById("ozet-alacak").textContent = para(toplamAlacak);
+    }
+
+    // ---- Form açma / kapama ----
+    var perde = document.getElementById("perde");
+    var alanAd = document.getElementById("alan-ad");
+    var alanUcret = document.getElementById("alan-ucret");
+    var uyari = document.getElementById("uyari");
+
+    function formAc() {
+      alanAd.value = "";
+      alanUcret.value = "";
+      uyariGizle();
+      perde.classList.add("acik");
+      alanAd.focus();
+    }
+    function formKapat() {
+      perde.classList.remove("acik");
+    }
+    function uyariGoster(mesaj) {
+      uyari.textContent = mesaj;
+      uyari.classList.add("gorun");
+    }
+    function uyariGizle() {
+      uyari.classList.remove("gorun");
+    }
+
+    // ---- Kaydet ----
+    function kaydet() {
+      var ad = alanAd.value.trim();
+      var ucretMetin = alanUcret.value.trim();
+      var ucret = Number(ucretMetin);
+
+      // Basit doğrulama
+      if (ad === "") {
+        uyariGoster("Lütfen öğrenci adını yaz.");
+        return;
+      }
+      if (ucretMetin === "" || isNaN(ucret) || ucret < 0) {
+        uyariGoster("Lütfen geçerli bir ders ücreti gir.");
+        return;
+      }
+
+      // Yeni öğrenci: 0 ders, 0 ödendi ile başlar
+      ogrenciler.push({
+        ad: ad,
+        dersUcreti: ucret,
+        dersSayisi: 0,
+        odenenToplam: 0
+      });
+      ogrencileriYaz(ogrenciler); // kalıcı kayıt
+      ciz();
+      formKapat();
+    }
+
+    // ---- Olay bağlantıları ----
+    document.getElementById("ekle-btn").addEventListener("click", formAc);
+    document.getElementById("btn-vazgec").addEventListener("click", formKapat);
+    document.getElementById("btn-kaydet").addEventListener("click", kaydet);
+    // Perdenin boş alanına tıklayınca kapat (panele tıklayınca kapanmasın)
+    perde.addEventListener("click", function (e) {
+      if (e.target === perde) formKapat();
     });
 
-    document.getElementById("liste").innerHTML = listeHtml;
-    document.getElementById("ozet-kazanc").textContent = para(toplamKazanc);
-    document.getElementById("ozet-alacak").textContent = para(toplamAlacak);
+    // İlk çizim
+    ciz();
   </script>
 </body>
 </html>
