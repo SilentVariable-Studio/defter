@@ -249,6 +249,10 @@
       border-radius: 18px;
       padding: 22px 18px;
       box-shadow: 0 12px 40px rgba(65, 36, 2, 0.25);
+      /* Telefonda taşarsa pencere içinde dikey kaydırılsın */
+      max-height: 90vh;
+      max-height: 90dvh;
+      overflow-y: auto;
     }
     .form-panel h2 {
       margin: 0 0 16px;
@@ -341,6 +345,39 @@
       cursor: default;
     }
 
+    /* ---- Düzenleme penceresi: durum özeti ---- */
+    .durum-ozet {
+      background: var(--krem);
+      border-radius: 12px;
+      padding: 14px 16px;
+      margin-bottom: 16px;
+    }
+    .durum-ozet .satir {
+      display: flex;
+      justify-content: space-between;
+      align-items: baseline;
+      gap: 12px;
+      font-size: 14px;
+      padding: 3px 0;
+    }
+    .durum-ozet .satir > span:first-child { color: var(--kahve); }
+    .durum-ozet .satir .deger {
+      font-weight: 700;
+      color: var(--kahve-koyu);
+      text-align: right;
+    }
+    /* Kalan satırı, üstündekilerden ince bir çizgiyle ayrılsın */
+    .durum-ozet .kalan {
+      margin-top: 6px;
+      padding-top: 9px;
+      border-top: 1px solid #e6d9c2;
+    }
+    /* Kalan rengi kartla aynı kural: borç kırmızı, sıfır/peşin yeşil */
+    .durum-ozet .satir .deger.borc  { color: var(--kirmizi); }
+    .durum-ozet .satir .deger.temiz { color: var(--yesil); }
+    /* "Düzeltme" başlığı, özetin hemen altında ilişkili dursun */
+    .durum-ozet .duzelt-baslik { margin-top: 14px; }
+
     /* Düzenleme penceresindeki "Öğrenciyi sil" butonu (ayrı dursun) */
     .btn-sil {
       width: 100%;
@@ -413,6 +450,30 @@
 
       <div class="uyari" id="d-uyari"></div>
 
+      <!-- Durum özeti + Düzeltme: ilişkili üst blok.
+           Rakamlar, geri-al butonlarına basıldıkça anında güncellenir. -->
+      <div class="durum-ozet">
+        <div class="satir">
+          <span>Yapılan ders</span>
+          <span class="deger" id="d-ozet-ders">—</span>
+        </div>
+        <div class="satir">
+          <span>Alınan ödeme</span>
+          <span class="deger" id="d-ozet-odeme">—</span>
+        </div>
+        <div class="satir kalan">
+          <span>Kalan</span>
+          <span class="deger" id="d-ozet-kalan">—</span>
+        </div>
+
+        <div class="duzelt-baslik">Düzeltme</div>
+        <div class="duzelt-butonlar">
+          <button type="button" id="d-btn-ders-geri">Bir ders geri al</button>
+          <button type="button" id="d-btn-odeme-geri">Bir ödeme geri al</button>
+        </div>
+      </div>
+
+      <!-- Bilgiler -->
       <div class="form-alan">
         <label for="d-ad">Öğrenci adı</label>
         <input type="text" id="d-ad" autocomplete="off" />
@@ -421,12 +482,6 @@
         <label for="d-ucret">Ders ücreti (₺)</label>
         <input type="number" id="d-ucret" inputmode="numeric" min="0" />
         <div class="form-not">Bu ücret yalnızca bundan sonraki derslere uygulanır.</div>
-      </div>
-
-      <div class="duzelt-baslik">Düzeltme</div>
-      <div class="duzelt-butonlar">
-        <button type="button" id="d-btn-ders-geri">Bir ders geri al</button>
-        <button type="button" id="d-btn-odeme-geri">Bir ödeme geri al</button>
       </div>
 
       <div class="form-butonlar">
@@ -734,6 +789,9 @@
     var dUyari = document.getElementById("d-uyari");
     var dBtnDersGeri = document.getElementById("d-btn-ders-geri");
     var dBtnOdemeGeri = document.getElementById("d-btn-odeme-geri");
+    var dOzetDers = document.getElementById("d-ozet-ders");
+    var dOzetOdeme = document.getElementById("d-ozet-odeme");
+    var dOzetKalan = document.getElementById("d-ozet-kalan");
     var duzenleIndex = -1; // hangi öğrenci düzenleniyor
 
     // Geri alma butonlarını, olay var/yok durumuna göre etkin/pasif yap
@@ -744,6 +802,34 @@
       dBtnOdemeGeri.disabled = o.odemeOlaylari.length === 0;
     }
 
+    // Durum özetini (ders / ödeme / kalan) güncel olaylardan tazele.
+    // Geri-al butonları her basıldığında çağrılır; pencere kapanmadan güncellenir.
+    function duzenleOzetTazele() {
+      var o = ogrenciler[duzenleIndex];
+      if (!o) return;
+      var dersSayisi = dersSayisiOf(o);
+      var borc = borcToplamOf(o);           // ders olaylarının tutar toplamı
+      var odemeSayisi = o.odemeOlaylari.length;
+      var alinan = alinanToplamOf(o);       // ödeme olaylarının tutar toplamı
+      var kalan = borc - alinan;            // + borç, 0 temiz, - peşin
+
+      dOzetDers.textContent = dersSayisi + " (toplam " + para(borc) + ")";
+      dOzetOdeme.textContent = odemeSayisi + " kez (toplam " + para(alinan) + ")";
+
+      // Kalan değeri ve rengi (kartla aynı kural)
+      dOzetKalan.classList.remove("borc", "temiz");
+      if (kalan > 0) {
+        dOzetKalan.classList.add("borc");
+        dOzetKalan.textContent = para(kalan);
+      } else if (kalan === 0) {
+        dOzetKalan.classList.add("temiz");
+        dOzetKalan.textContent = "0 ₺";
+      } else {
+        dOzetKalan.classList.add("temiz");
+        dOzetKalan.textContent = para(-kalan) + " peşin";
+      }
+    }
+
     function duzenleAc(i) {
       duzenleIndex = i;
       var o = ogrenciler[i];
@@ -751,6 +837,7 @@
       dUcret.value = o.guncelDersUcreti;
       dUyari.classList.remove("gorun");
       geriAlButonlariniTazele();
+      duzenleOzetTazele();
       perdeDuzenle.classList.add("acik");
       dAd.focus();
     }
@@ -796,6 +883,7 @@
       ogrencileriYaz(ogrenciler);
       ciz();
       geriAlButonlariniTazele();
+      duzenleOzetTazele();
     }
     // En son ödeme olayını (kendi tutarıyla) sil; pencere açık kalır
     function odemeGeriAl() {
@@ -805,6 +893,7 @@
       ogrencileriYaz(ogrenciler);
       ciz();
       geriAlButonlariniTazele();
+      duzenleOzetTazele();
     }
 
     function duzenleSil() {
