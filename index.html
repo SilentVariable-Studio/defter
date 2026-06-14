@@ -25,11 +25,24 @@
       --soluk: #9b8a73;      /* öğrenci kartı küçük gri-kahve yazı */
     }
 
-    * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+    /* Uygulama hissi: tarayıcının dokunma davranışlarını kısıtla */
+    * {
+      box-sizing: border-box;
+      -webkit-tap-highlight-color: transparent; /* dokununca gri parlama olmasın */
+      -webkit-touch-callout: none;              /* uzun basınca menü/önizleme çıkmasın */
+      -webkit-user-select: none;                /* metin seçimini kapat */
+      user-select: none;
+    }
 
-    /* İçerik azken sayfanın gereksiz kaymasını / yaylanmasını engelle */
+    /* ÖNEMLİ İSTİSNA: giriş alanlarında seçim ve yazma çalışmaya devam etsin */
+    input, textarea {
+      -webkit-user-select: text;
+      user-select: text;
+    }
+
+    /* İçerik azken gereksiz kayma; pull-to-refresh ve zincirleme kaydırmayı engelle */
     html, body {
-      overscroll-behavior-y: none; /* zincirleme kaydırma + yaylanmayı kes */
+      overscroll-behavior: none;
     }
 
     body {
@@ -40,6 +53,8 @@
       /* Telefonda tek elle okunacak ölçek */
       font-size: 16px;
       line-height: 1.4;
+      /* Çift dokunuşla yakınlaştırmayı/gecikmeyi engelle */
+      touch-action: manipulation;
     }
 
     /* Sayfayı telefon genişliğinde ortalı tut */
