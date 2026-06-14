@@ -130,6 +130,25 @@
     .ogrenci .alt .kaldi.borc { color: var(--kirmizi); font-weight: 600; }
     .ogrenci .alt .kaldi.temiz { color: var(--yesil); font-weight: 600; }
 
+    /* Kart içi eylem butonları: "Ders yapıldı" / "Ödeme aldım" */
+    .ogrenci .eylemler {
+      display: flex;
+      gap: 8px;
+      margin-top: 14px;
+    }
+    .ogrenci .eylemler button {
+      flex: 1;
+      padding: 11px;
+      border: 1px solid #e6d9c2;
+      border-radius: 11px;
+      background: #fffdf9;
+      color: var(--kahve);
+      font-size: 14px;
+      font-weight: 600;
+      cursor: pointer;
+    }
+    .ogrenci .eylemler button:active { transform: translateY(1px); }
+
     /* ---- Boş durum mesajı ---- */
     .bos-durum {
       background: var(--kart);
@@ -253,7 +272,7 @@
     <!-- Özet kartları -->
     <div class="ozet">
       <div class="kart kazanc">
-        <div class="etiket">Bu ay kazanç</div>
+        <div class="etiket">Toplam tahsilat</div>
         <div class="deger" id="ozet-kazanc">—</div>
       </div>
       <div class="kart alacak">
@@ -340,14 +359,25 @@
           '<div class="bos-durum">Henüz öğrenci yok.<br>Aşağıdaki + Öğrenci ekle ile başla.</div>';
       } else {
         var html = "";
-        ogrenciler.forEach(function (o) {
+        ogrenciler.forEach(function (o, i) {
           var hakedis = o.dersSayisi * o.dersUcreti; // yapılan derslerin tutarı
-          var kalan = hakedis - o.odenenToplam;       // kalan borç
+          var kalan = hakedis - o.odenenToplam;       // + borç, 0 temiz, - peşin
 
           toplamKazanc += o.odenenToplam;
-          toplamAlacak += kalan;
+          if (kalan > 0) toplamAlacak += kalan; // alacağa yalnızca borçları kat
 
-          var kaldiSinif = kalan > 0 ? "borc" : "temiz";
+          // Kalan değerinin gösterimi
+          var kaldiSinif, kaldiYazi;
+          if (kalan > 0) {
+            kaldiSinif = "borc";
+            kaldiYazi = para(kalan) + " kaldı";
+          } else if (kalan === 0) {
+            kaldiSinif = "temiz";
+            kaldiYazi = "0 ₺";
+          } else {
+            kaldiSinif = "temiz";
+            kaldiYazi = para(-kalan) + " peşin";
+          }
 
           html +=
             '<div class="ogrenci">' +
@@ -360,7 +390,11 @@
                 '<span class="ayrac">·</span>' +
                 '<span>' + para(o.odenenToplam) + ' ödendi</span>' +
                 '<span class="ayrac">·</span>' +
-                '<span class="kaldi ' + kaldiSinif + '">' + para(kalan > 0 ? kalan : 0) + ' kaldı</span>' +
+                '<span class="kaldi ' + kaldiSinif + '">' + kaldiYazi + '</span>' +
+              '</div>' +
+              '<div class="eylemler">' +
+                '<button type="button" data-eylem="ders" data-index="' + i + '">Ders yapıldı</button>' +
+                '<button type="button" data-eylem="odeme" data-index="' + i + '">Ödeme aldım</button>' +
               '</div>' +
             '</div>';
         });
@@ -422,6 +456,32 @@
       ciz();
       formKapat();
     }
+
+    // ---- Kart içi eylemler: ders yapıldı / ödeme aldım ----
+    function dersYapildi(o) {
+      o.dersSayisi += 1;
+    }
+    function odemeAldim(o) {
+      o.odenenToplam += o.dersUcreti; // bir ders ücreti kadar
+    }
+
+    // Liste içindeki butonlara tek dinleyiciyle bağlan
+    document.getElementById("liste").addEventListener("click", function (e) {
+      var btn = e.target.closest("button[data-eylem]");
+      if (!btn) return;
+
+      var o = ogrenciler[Number(btn.getAttribute("data-index"))];
+      if (!o) return;
+
+      if (btn.getAttribute("data-eylem") === "ders") {
+        dersYapildi(o);
+      } else {
+        odemeAldim(o);
+      }
+
+      ogrencileriYaz(ogrenciler); // kalıcı kayıt
+      ciz();                      // liste + özet yeniden hesaplanır
+    });
 
     // ---- Olay bağlantıları ----
     document.getElementById("ekle-btn").addEventListener("click", formAc);
