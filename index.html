@@ -107,6 +107,13 @@
       letter-spacing: 0.5px;
       color: var(--kahve-koyu);
     }
+    /* Başlık altı küçük, silik alt yazı (ikincil — başlığı gölgede bırakmaz) */
+    .baslik .alt-yazi {
+      margin: 4px 0 0;
+      font-size: 13px;
+      font-style: italic;
+      color: var(--soluk);
+    }
 
     /* ---- Özet kartları ---- */
     .ozet {
@@ -484,6 +491,12 @@
       cursor: pointer;
     }
     .menu-panel button:active { background: var(--krem); }
+    /* İki menü grubunu ayıran ince, sade çizgi (mevcut kenarlık rengi) */
+    .menu-ayrac {
+      height: 1px;
+      background: #e6d9c2;
+      margin: 6px 8px;
+    }
 
     /* ---- Hakkında penceresi ---- */
     .hakkinda-panel h2 {
@@ -554,6 +567,7 @@
   <div class="ekran">
     <div class="baslik">
       <h1>Defter</h1>
+      <p class="alt-yazi">Emeğinin hesabı sende kalsın.</p>
       <button type="button" class="menu-btn" id="menu-btn" aria-label="Menü" title="Menü">
         <span></span><span></span><span></span>
       </button>
@@ -686,9 +700,12 @@
   <!-- Hamburger menüsü (açılır seçim penceresi) -->
   <div class="perde menu" id="perde-menu">
     <div class="menu-panel">
-      <button type="button" id="menu-hakkinda">Hakkında</button>
+      <!-- Veri grubu -->
       <button type="button" id="menu-yedek-al">Yedek al</button>
       <button type="button" id="menu-yedek-yukle">Yedek geri yükle</button>
+      <div class="menu-ayrac"></div>
+      <!-- Bilgi / iletişim grubu -->
+      <button type="button" id="menu-hakkinda">Hakkında</button>
       <button type="button" id="menu-geribildirim">Geri bildirim gönder</button>
     </div>
   </div>
