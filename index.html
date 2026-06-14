@@ -103,11 +103,27 @@
       align-items: center;
       margin-bottom: 10px;
     }
+    .ogrenci .ust-sag {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
     .ogrenci .ad {
       font-size: 18px;
       font-weight: 700;
       color: var(--kahve-koyu);
     }
+    /* Köşedeki sade düzenle (kalem) simgesi */
+    .ogrenci .duzenle {
+      border: none;
+      background: transparent;
+      color: var(--soluk);
+      font-size: 16px;
+      line-height: 1;
+      padding: 4px;
+      cursor: pointer;
+    }
+    .ogrenci .duzenle:active { transform: translateY(1px); }
     /* Ücret etiketi: krem zemin, kahve yazı, hap şekli */
     .ogrenci .ucret {
       font-size: 13px;
@@ -260,6 +276,21 @@
     .btn-kaydet { background: var(--amber); color: #fff; }
     .btn-vazgec { background: var(--krem); color: var(--kahve); }
     .form-butonlar button:active { transform: translateY(1px); }
+
+    /* Düzenleme penceresindeki "Öğrenciyi sil" butonu (ayrı dursun) */
+    .btn-sil {
+      width: 100%;
+      margin-top: 16px;
+      padding: 13px;
+      border: 1px solid #ecc9c9;
+      border-radius: 12px;
+      background: #fbe9e7;
+      color: var(--kirmizi);
+      font-size: 14px;
+      font-weight: 600;
+      cursor: pointer;
+    }
+    .btn-sil:active { transform: translateY(1px); }
   </style>
 </head>
 <body>
@@ -307,6 +338,39 @@
         <button type="button" class="btn-vazgec" id="btn-vazgec">Vazgeç</button>
         <button type="button" class="btn-kaydet" id="btn-kaydet">Kaydet</button>
       </div>
+    </div>
+  </div>
+
+  <!-- Öğrenci düzenleme formu (açılır panel) -->
+  <div class="perde" id="perde-duzenle">
+    <div class="form-panel">
+      <h2>Öğrenciyi düzenle</h2>
+
+      <div class="uyari" id="d-uyari"></div>
+
+      <div class="form-alan">
+        <label for="d-ad">Öğrenci adı</label>
+        <input type="text" id="d-ad" autocomplete="off" />
+      </div>
+      <div class="form-alan">
+        <label for="d-ucret">Ders ücreti (₺)</label>
+        <input type="number" id="d-ucret" inputmode="numeric" min="0" />
+      </div>
+      <div class="form-alan">
+        <label for="d-ders">Ders sayısı</label>
+        <input type="number" id="d-ders" inputmode="numeric" min="0" />
+      </div>
+      <div class="form-alan">
+        <label for="d-odenen">Alınan toplam (₺)</label>
+        <input type="number" id="d-odenen" inputmode="numeric" min="0" />
+      </div>
+
+      <div class="form-butonlar">
+        <button type="button" class="btn-vazgec" id="d-btn-vazgec">Vazgeç</button>
+        <button type="button" class="btn-kaydet" id="d-btn-kaydet">Kaydet</button>
+      </div>
+
+      <button type="button" class="btn-sil" id="d-btn-sil">Öğrenciyi sil</button>
     </div>
   </div>
 
@@ -383,7 +447,10 @@
             '<div class="ogrenci">' +
               '<div class="ust">' +
                 '<div class="ad">' + kacis(o.ad) + '</div>' +
-                '<div class="ucret">' + para(o.dersUcreti) + ' / ders</div>' +
+                '<div class="ust-sag">' +
+                  '<div class="ucret">' + para(o.dersUcreti) + ' / ders</div>' +
+                  '<button type="button" class="duzenle" data-eylem="duzenle" data-index="' + i + '" aria-label="Düzenle" title="Düzenle">✎</button>' +
+                '</div>' +
               '</div>' +
               '<div class="alt">' +
                 '<span>' + o.dersSayisi + ' ders</span>' +
@@ -470,10 +537,17 @@
       var btn = e.target.closest("button[data-eylem]");
       if (!btn) return;
 
-      var o = ogrenciler[Number(btn.getAttribute("data-index"))];
+      var index = Number(btn.getAttribute("data-index"));
+      var o = ogrenciler[index];
       if (!o) return;
 
-      if (btn.getAttribute("data-eylem") === "ders") {
+      var eylem = btn.getAttribute("data-eylem");
+      if (eylem === "duzenle") {
+        duzenleAc(index); // düzenleme penceresini aç, kayıt burada değil
+        return;
+      }
+
+      if (eylem === "ders") {
         dersYapildi(o);
       } else {
         odemeAldim(o);
@@ -483,6 +557,83 @@
       ciz();                      // liste + özet yeniden hesaplanır
     });
 
+    // ---- Düzenleme / silme ----
+    var perdeDuzenle = document.getElementById("perde-duzenle");
+    var dAd = document.getElementById("d-ad");
+    var dUcret = document.getElementById("d-ucret");
+    var dDers = document.getElementById("d-ders");
+    var dOdenen = document.getElementById("d-odenen");
+    var dUyari = document.getElementById("d-uyari");
+    var duzenleIndex = -1; // hangi öğrenci düzenleniyor
+
+    function duzenleAc(i) {
+      duzenleIndex = i;
+      var o = ogrenciler[i];
+      dAd.value = o.ad;
+      dUcret.value = o.dersUcreti;
+      dDers.value = o.dersSayisi;
+      dOdenen.value = o.odenenToplam;
+      dUyari.classList.remove("gorun");
+      perdeDuzenle.classList.add("acik");
+      dAd.focus();
+    }
+    function duzenleKapat() {
+      perdeDuzenle.classList.remove("acik");
+      duzenleIndex = -1;
+    }
+    function dUyariGoster(mesaj) {
+      dUyari.textContent = mesaj;
+      dUyari.classList.add("gorun");
+    }
+
+    function duzenleKaydet() {
+      var o = ogrenciler[duzenleIndex];
+      if (!o) return;
+
+      var ad = dAd.value.trim();
+      var ucret = Number(dUcret.value.trim());
+      var ders = Number(dDers.value.trim());
+      var odenen = Number(dOdenen.value.trim());
+
+      // Doğrulama
+      if (ad === "") {
+        dUyariGoster("Lütfen öğrenci adını yaz.");
+        return;
+      }
+      if (dUcret.value.trim() === "" || isNaN(ucret) || ucret < 0) {
+        dUyariGoster("Lütfen geçerli bir ders ücreti gir.");
+        return;
+      }
+      if (dDers.value.trim() === "" || isNaN(ders) || ders < 0) {
+        dUyariGoster("Lütfen geçerli bir ders sayısı gir.");
+        return;
+      }
+      if (dOdenen.value.trim() === "" || isNaN(odenen) || odenen < 0) {
+        dUyariGoster("Lütfen geçerli bir alınan toplam gir.");
+        return;
+      }
+
+      o.ad = ad;
+      o.dersUcreti = ucret;
+      o.dersSayisi = ders;
+      o.odenenToplam = odenen;
+
+      ogrencileriYaz(ogrenciler); // kalıcı kayıt
+      ciz();
+      duzenleKapat();
+    }
+
+    function duzenleSil() {
+      var o = ogrenciler[duzenleIndex];
+      if (!o) return;
+      if (!confirm("Bu öğrenciyi silmek istediğine emin misin?")) return;
+
+      ogrenciler.splice(duzenleIndex, 1);
+      ogrencileriYaz(ogrenciler); // kalıcı kayıt
+      ciz();
+      duzenleKapat();
+    }
+
     // ---- Olay bağlantıları ----
     document.getElementById("ekle-btn").addEventListener("click", formAc);
     document.getElementById("btn-vazgec").addEventListener("click", formKapat);
@@ -490,6 +641,13 @@
     // Perdenin boş alanına tıklayınca kapat (panele tıklayınca kapanmasın)
     perde.addEventListener("click", function (e) {
       if (e.target === perde) formKapat();
+    });
+
+    document.getElementById("d-btn-vazgec").addEventListener("click", duzenleKapat);
+    document.getElementById("d-btn-kaydet").addEventListener("click", duzenleKaydet);
+    document.getElementById("d-btn-sil").addEventListener("click", duzenleSil);
+    perdeDuzenle.addEventListener("click", function (e) {
+      if (e.target === perdeDuzenle) duzenleKapat();
     });
 
     // İlk çizim
