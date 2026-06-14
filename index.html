@@ -540,6 +540,14 @@
       padding: 0;
     }
     .kapat-x:active { transform: translateY(1px); }
+
+    /* Yedek hatırlatma penceresindeki tek satırlık mesaj */
+    .hatirlat-mesaj {
+      margin: 0 0 18px;
+      font-size: 15px;
+      line-height: 1.5;
+      color: var(--kahve-koyu);
+    }
   </style>
 </head>
 <body>
@@ -706,6 +714,17 @@
       </div>
 
       <div class="telif">© 2026 SilentVariable-Studio</div>
+    </div>
+  </div>
+
+  <!-- Yedek hatırlatma penceresi (eşik aşılınca nazikçe çıkar) -->
+  <div class="perde" id="perde-hatirlat">
+    <div class="form-panel">
+      <p class="hatirlat-mesaj">Bir süredir yedek almadın. Verilerini güvende tutmak için yedek almak iyi olur.</p>
+      <div class="form-butonlar">
+        <button type="button" class="btn-vazgec" id="hatirlat-sonra">Şimdi değil</button>
+        <button type="button" class="btn-kaydet" id="hatirlat-yedek">Yedek al</button>
+      </div>
     </div>
   </div>
 
@@ -1054,6 +1073,8 @@
 
       ogrencileriYaz(ogrenciler); // kalıcı kayıt
       ciz();                      // liste + özet yeniden hesaplanır
+      islemSayisiArtir();         // ders/ödeme: yedek hatırlatma sayacını 1 artır
+      hatirlatmaDegerlendir();    // eşiğe ulaşıldıysa nazikçe hatırlat
     });
 
     // ---- Düzenleme / silme ----
@@ -1331,6 +1352,7 @@
     document.getElementById("menu-yedek-al").addEventListener("click", function () {
       menuKapat();
       yedekAl();
+      yedekSayaciniSifirla(); // yedek alındı: hatırlatma sayacı sıfırlanır
     });
     document.getElementById("menu-yedek-yukle").addEventListener("click", function () {
       menuKapat();
@@ -1343,8 +1365,61 @@
       }
     });
 
+    // ---- Yedek hatırlatması (veri kaybını önlemek için nazik uyarı) ----
+    // Son yedekten bu yana eklenen işlem (ders/ödeme) sayısı localStorage'da tutulur.
+    // Eşiğe ulaşınca, açılışta veya yeni işlem eklendiğinde hatırlatma gösterilir.
+    var SAYAC_ANAHTAR = "defter_yedek_sayaci";
+    var HATIRLATMA_ESIK = 20;
+    var perdeHatirlat = document.getElementById("perde-hatirlat");
+    // "Şimdi değil" denince aynı oturumda tekrar açılıp kullanıcıyı boğmasın.
+    // Oturumluk (kalıcı değil) — sonraki açılışta yeniden değerlendirilir.
+    var hatirlatmaBuOturumKapatildi = false;
+
+    function islemSayisiOku() {
+      var n = parseInt(localStorage.getItem(SAYAC_ANAHTAR), 10);
+      return isNaN(n) || n < 0 ? 0 : n;
+    }
+    function islemSayisiArtir() {
+      localStorage.setItem(SAYAC_ANAHTAR, String(islemSayisiOku() + 1));
+    }
+    function yedekSayaciniSifirla() {
+      localStorage.setItem(SAYAC_ANAHTAR, "0");
+    }
+
+    function hatirlatmaAc()    { perdeHatirlat.classList.add("acik"); }
+    function hatirlatmaKapat() { perdeHatirlat.classList.remove("acik"); }
+
+    // Koşullar: eşiğe ulaşıldı + bu oturumda kapatılmadı + gerçekten kaydı olan kullanıcı.
+    // Hiç öğrencisi olmayan (ilk açan) kullanıcıya çıkmaz.
+    function hatirlatmaDegerlendir() {
+      if (hatirlatmaBuOturumKapatildi) return;
+      if (ogrenciler.length === 0) return;
+      if (islemSayisiOku() < HATIRLATMA_ESIK) return;
+      hatirlatmaAc();
+    }
+
+    document.getElementById("hatirlat-yedek").addEventListener("click", function () {
+      hatirlatmaKapat();
+      yedekAl();
+      yedekSayaciniSifirla(); // yedek alındı: sayaç sıfırlanır
+    });
+    document.getElementById("hatirlat-sonra").addEventListener("click", function () {
+      hatirlatmaKapat();
+      hatirlatmaBuOturumKapatildi = true; // bu oturumda bir daha gösterme
+    });
+    // Pencere dışına dokununca da "şimdi değil" gibi davransın
+    perdeHatirlat.addEventListener("click", function (e) {
+      if (e.target === perdeHatirlat) {
+        hatirlatmaKapat();
+        hatirlatmaBuOturumKapatildi = true;
+      }
+    });
+
     // İlk çizim
     ciz();
+
+    // Açılışta yedek hatırlatmasını değerlendir
+    hatirlatmaDegerlendir();
 
     // ---- PWA: service worker kaydı (göreli yol) ----
     // Not: yalnızca https/internet adresinde çalışır; file:// (çift tıklama) ile çalışmaz.
