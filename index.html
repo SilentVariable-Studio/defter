@@ -377,15 +377,6 @@
     .durum-ozet .satir .deger.temiz { color: var(--yesil); }
     /* "Düzeltme" başlığı, özetin hemen altında ilişkili dursun */
     .durum-ozet .duzelt-baslik { margin-top: 14px; }
-    /* Geri-al'a basınca değişen satır bir an parlayıp sönsün (sadece görsel) */
-    @keyframes ozetVurgu {
-      0%   { background: rgba(186, 117, 23, 0.22); }
-      100% { background: transparent; }
-    }
-    .durum-ozet .satir.vurgu {
-      border-radius: 8px;
-      animation: ozetVurgu 0.5s ease-out;
-    }
 
     /* Düzenleme penceresindeki "Öğrenciyi sil" butonu (ayrı dursun) */
     .btn-sil {
@@ -839,16 +830,6 @@
       }
     }
 
-    // Bir özet satırını kısa bir an vurgula (dokunuşun işlediğini göstermek için).
-    // Sınıfı önce kaldırıp reflow ile yeniden ekleyerek animasyon her basışta tetiklenir.
-    function ozetSatirVurgula(span) {
-      var satir = span.closest(".satir");
-      if (!satir) return;
-      satir.classList.remove("vurgu");
-      void satir.offsetWidth; // animasyonu yeniden başlatmak için reflow zorla
-      satir.classList.add("vurgu");
-    }
-
     function duzenleAc(i) {
       duzenleIndex = i;
       var o = ogrenciler[i];
@@ -903,8 +884,6 @@
       ciz();
       geriAlButonlariniTazele();
       duzenleOzetTazele();
-      ozetSatirVurgula(dOzetDers);  // ders satırı değişti
-      ozetSatirVurgula(dOzetKalan); // kalan da güncellendi
     }
     // En son ödeme olayını (kendi tutarıyla) sil; pencere açık kalır
     function odemeGeriAl() {
@@ -915,8 +894,6 @@
       ciz();
       geriAlButonlariniTazele();
       duzenleOzetTazele();
-      ozetSatirVurgula(dOzetOdeme); // ödeme satırı değişti
-      ozetSatirVurgula(dOzetKalan); // kalan da güncellendi
     }
 
     function duzenleSil() {
