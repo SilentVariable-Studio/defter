@@ -272,11 +272,11 @@
     <!-- Özet kartları -->
     <div class="ozet">
       <div class="kart kazanc">
-        <div class="etiket">Toplam tahsilat</div>
+        <div class="etiket">Alınan ödeme</div>
         <div class="deger" id="ozet-kazanc">—</div>
       </div>
       <div class="kart alacak">
-        <div class="etiket">Toplam alacak</div>
+        <div class="etiket">Kalan ödeme</div>
         <div class="deger" id="ozet-alacak">—</div>
       </div>
     </div>
@@ -370,10 +370,10 @@
           var kaldiSinif, kaldiYazi;
           if (kalan > 0) {
             kaldiSinif = "borc";
-            kaldiYazi = para(kalan) + " kaldı";
+            kaldiYazi = "kalan " + para(kalan);
           } else if (kalan === 0) {
             kaldiSinif = "temiz";
-            kaldiYazi = "0 ₺";
+            kaldiYazi = "kalan 0 ₺";
           } else {
             kaldiSinif = "temiz";
             kaldiYazi = para(-kalan) + " peşin";
@@ -388,7 +388,7 @@
               '<div class="alt">' +
                 '<span>' + o.dersSayisi + ' ders</span>' +
                 '<span class="ayrac">·</span>' +
-                '<span>' + para(o.odenenToplam) + ' ödendi</span>' +
+                '<span>alınan ' + para(o.odenenToplam) + '</span>' +
                 '<span class="ayrac">·</span>' +
                 '<span class="kaldi ' + kaldiSinif + '">' + kaldiYazi + '</span>' +
               '</div>' +
