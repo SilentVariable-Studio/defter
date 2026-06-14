@@ -679,9 +679,14 @@
   <div class="perde menu" id="perde-menu">
     <div class="menu-panel">
       <button type="button" id="menu-hakkinda">Hakkında</button>
+      <button type="button" id="menu-yedek-al">Yedek al</button>
+      <button type="button" id="menu-yedek-yukle">Yedek geri yükle</button>
       <button type="button" id="menu-geribildirim">Geri bildirim gönder</button>
     </div>
   </div>
+
+  <!-- Yedek geri yükleme için gizli dosya seçici (görünmez, tasarımı etkilemez) -->
+  <input type="file" id="yedek-dosya" accept="application/json,.json" style="display:none" />
 
   <!-- Hakkında penceresi -->
   <div class="perde" id="perde-hakkinda">
@@ -1238,6 +1243,104 @@
     document.getElementById("hakkinda-kapat").addEventListener("click", hakkindaKapat);
     perdeHakkinda.addEventListener("click", function (e) {
       if (e.target === perdeHakkinda) hakkindaKapat();
+    });
+
+    // ---- Yedek al / geri yükle (TAMAMEN cihazda; internet/gönderme yok) ----
+    // Uygulamanın localStorage'da kullandığı TÜM anahtarlar. Yedek bunların
+    // tamamını kapsar ki geri yükleme birebir aynısını getirsin.
+    var YEDEK_ANAHTARLAR = [DEPO_ANAHTAR];
+    var YEDEK_IMZA = "defter"; // yedeğin Defter'e ait olduğunu doğrulamak için
+
+    // Bugünün tarihini "YYYY-AA-GG" biçiminde döndür (yerel)
+    function bugunTarihMetni() {
+      var d = new Date();
+      var ay = String(d.getMonth() + 1).padStart(2, "0");
+      var gun = String(d.getDate()).padStart(2, "0");
+      return d.getFullYear() + "-" + ay + "-" + gun;
+    }
+
+    // Yedek al: tüm anahtarları başlıklı tek bir JSON'da topla ve dosya indir
+    function yedekAl() {
+      var veri = {};
+      for (var i = 0; i < YEDEK_ANAHTARLAR.length; i++) {
+        var k = YEDEK_ANAHTARLAR[i];
+        veri[k] = localStorage.getItem(k); // ham değer; geri yüklemede birebir yazılır
+      }
+      var paket = {
+        uygulama: YEDEK_IMZA, // doğrulama başlığı
+        surum: 1,
+        tarih: new Date().toISOString(),
+        veri: veri
+      };
+      var blob = new Blob([JSON.stringify(paket, null, 2)], { type: "application/json" });
+      var url = URL.createObjectURL(blob);
+      var a = document.createElement("a");
+      a.href = url;
+      a.download = "defter-yedek-" + bugunTarihMetni() + ".json";
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+    }
+
+    // Seçilen dosyayı oku, DOĞRULA, onaydan sonra geri yükle.
+    // Geçersiz dosyada hiçbir şey değiştirilmez.
+    function yedekYukle(dosya) {
+      var okuyucu = new FileReader();
+      okuyucu.onload = function () {
+        var paket;
+        try {
+          paket = JSON.parse(okuyucu.result);
+        } catch (e) {
+          alert("Bu dosya geçerli bir Defter yedeği değil. Hiçbir şey değiştirilmedi.");
+          return;
+        }
+        // Doğrulama: Defter imzası + beklenen anahtar var mı?
+        var gecerli =
+          paket && typeof paket === "object" &&
+          paket.uygulama === YEDEK_IMZA &&
+          paket.veri && typeof paket.veri === "object" &&
+          Object.prototype.hasOwnProperty.call(paket.veri, DEPO_ANAHTAR);
+        if (!gecerli) {
+          alert("Bu dosya geçerli bir Defter yedeği değil. Hiçbir şey değiştirilmedi.");
+          return;
+        }
+        // Üstüne yazma uyarısı / açık onay
+        if (!confirm("Yedek geri yüklenecek. Şu anki TÜM kayıtların üstüne yazılacak ve bu geri alınamaz. Devam edilsin mi?")) {
+          return; // vazgeçildi: mevcut veri korunur
+        }
+        // Anahtarları birebir geri yaz (string ise yaz, yoksa anahtarı kaldır)
+        for (var i = 0; i < YEDEK_ANAHTARLAR.length; i++) {
+          var k = YEDEK_ANAHTARLAR[i];
+          if (typeof paket.veri[k] === "string") {
+            localStorage.setItem(k, paket.veri[k]);
+          } else {
+            localStorage.removeItem(k);
+          }
+        }
+        // Ekranı yenile ki kayıtlar hemen görünsün
+        location.reload();
+      };
+      okuyucu.onerror = function () {
+        alert("Dosya okunamadı. Hiçbir şey değiştirilmedi.");
+      };
+      okuyucu.readAsText(dosya);
+    }
+
+    var yedekDosya = document.getElementById("yedek-dosya");
+    document.getElementById("menu-yedek-al").addEventListener("click", function () {
+      menuKapat();
+      yedekAl();
+    });
+    document.getElementById("menu-yedek-yukle").addEventListener("click", function () {
+      menuKapat();
+      yedekDosya.value = ""; // aynı dosya tekrar seçilebilsin
+      yedekDosya.click();
+    });
+    yedekDosya.addEventListener("change", function () {
+      if (yedekDosya.files && yedekDosya.files[0]) {
+        yedekYukle(yedekDosya.files[0]);
+      }
     });
 
     // İlk çizim
