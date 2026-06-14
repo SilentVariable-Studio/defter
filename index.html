@@ -5,6 +5,13 @@
   <!-- Telefon ekranına göre ölçeklenmesi için -->
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>Defter</title>
+
+  <!-- PWA: kurulabilir / çevrimdışı (tüm yollar göreli) -->
+  <link rel="manifest" href="manifest.webmanifest" />
+  <meta name="theme-color" content="#BA7517" />
+  <link rel="apple-touch-icon" href="apple-touch-icon.png" />
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-title" content="Defter" />
   <style>
     /* ---- Renkler (sıcak "defter/kağıt" teması) ---- */
     :root {
@@ -826,6 +833,16 @@
 
     // İlk çizim
     ciz();
+
+    // ---- PWA: service worker kaydı (göreli yol) ----
+    // Not: yalnızca https/internet adresinde çalışır; file:// (çift tıklama) ile çalışmaz.
+    if ("serviceWorker" in navigator) {
+      window.addEventListener("load", function () {
+        navigator.serviceWorker.register("sw.js").catch(function () {
+          // Kayıt başarısızsa uygulama yine normal çalışır; sessiz geç.
+        });
+      });
+    }
   </script>
 </body>
 </html>
