@@ -232,6 +232,10 @@
       cursor: pointer;
     }
     .ogrenci .eylemler button:active { transform: translateY(1px); }
+    .ogrenci .eylemler button:disabled {
+      opacity: 0.45;
+      cursor: default;
+    }
 
     /* ---- Arama kutusu ---- */
     .arama {
@@ -439,7 +443,7 @@
       padding-top: 9px;
       border-top: 1px solid #e6d9c2;
     }
-    /* Kalan rengi kartla aynı kural: borç kırmızı, sıfır/peşin yeşil */
+    /* Kalan rengi kartla aynı kural: borç kırmızı, sıfır yeşil */
     .durum-ozet .satir .deger.borc  { color: var(--kirmizi); }
     .durum-ozet .satir .deger.temiz { color: var(--yesil); }
     /* "Düzeltme" başlığı, özetin hemen altında ilişkili dursun */
@@ -712,58 +716,77 @@
     //  Her öğrenci (yeni biçim):
     //    {
     //      ad,
-    //      sinif,                     // "5".."12" | "Mezun" | "Diğer" | "" (belirtilmemiş)
-    //      guncelDersUcreti,          // yeni olaylar bu fiyattan eklenir
-    //      dersOlaylari:  [tutar, ...],  // her "Ders yapıldı" basışı
-    //      odemeOlaylari: [tutar, ...]   // her "Ödeme aldım" basışı
+    //      sinif,                  // "5".."12" | "Mezun" | "Diğer" | "" (belirtilmemiş)
+    //      guncelDersUcreti,       // yeni dersler bu fiyattan eklenir
+    //      dersOlaylari: [tutar, ...],  // her "Ders yapıldı" — sıralı, her ders kendi fiyatıyla
+    //      odenmisDersSayisi       // en eski derslerden kaçının ödendiği (0 .. dersOlaylari.length)
     //    }
-    //  Hesaplar bu listelerden türer; geçmiş olaylar ASLA yeniden fiyatlanmaz.
+    //  Ödeme, en eski ödenmemiş dersi O DERSİN kendi fiyatından kapatır (güncel ücret değil).
     //    ders sayısı   = dersOlaylari.length
     //    borç toplamı  = dersOlaylari toplamı
-    //    alınan toplam = odemeOlaylari toplamı
-    //    kalan         = borç toplamı − alınan toplam
+    //    alınan toplam = en eski (odenmisDersSayisi) dersin fiyatları toplamı
+    //    kalan         = borç toplamı − alınan toplam   (her zaman ≥ 0)
     // =========================================================
     var DEPO_ANAHTAR = "defter_ogrenciler";
 
-    // Bir toplamı, "birim" büyüklüğünde olaylara böler (toplam aynen korunur).
-    // Göç sırasında eski "alınan toplam" değerini olaylara çevirmek için kullanılır.
-    function tutariBol(toplam, birim) {
-      var olaylar = [];
-      if (birim > 0) {
-        var tam = Math.floor(toplam / birim);
-        for (var k = 0; k < tam; k++) olaylar.push(birim);
-        var artan = toplam - tam * birim;
-        if (artan > 0) olaylar.push(artan);
-      } else if (toplam > 0) {
-        olaylar.push(toplam); // ücret 0 ise tek parça olarak sakla
+    // Bir ödeme toplamını "ödenmiş ders sayısı"na çevir:
+    // dersleri en eskiden başlayarak sırayla (her dersin kendi fiyatını düşerek) kapatır;
+    // tam kapatılabilen ders adedini döndürür. Artakalan küçük tutar yok sayılır.
+    function odemeyiDerslereCevir(dersOlaylari, odenen) {
+      var kalanOdeme = odenen;
+      var sayi = 0;
+      for (var k = 0; k < dersOlaylari.length; k++) {
+        if (kalanOdeme >= dersOlaylari[k]) {
+          kalanOdeme -= dersOlaylari[k];
+          sayi++;
+        } else {
+          break; // bu ders tam kapanmıyor; artakalan yok sayılır
+        }
       }
-      return olaylar;
+      return sayi;
     }
 
-    // Eski biçimdeki bir öğrenciyi yeni biçime dönüştür (sayılar aynen korunur).
-    // sinif alanı yoksa "" (belirtilmemiş) sayılır; sayılar/işlemler korunur.
+    // Eski biçimdeki bir öğrenciyi yeni biçime dönüştür (veri kaybı olmadan).
+    // Eski ödemeler, dersleri en eskiden kapatarak "ödenmiş ders sayısı"na çevrilir.
+    // sinif alanı yoksa "" (belirtilmemiş) sayılır.
     function gocEt(o) {
-      // Zaten yeni biçimdeyse sadece eksik alanı tamamla
-      if (Array.isArray(o.dersOlaylari) && Array.isArray(o.odemeOlaylari)) {
-        if (typeof o.guncelDersUcreti !== "number") {
-          o.guncelDersUcreti = typeof o.dersUcreti === "number" ? o.dersUcreti : 0;
-        }
-        if (typeof o.sinif !== "string") o.sinif = ""; // eski kayıt: belirtilmemiş
-        return o;
-      }
-      var ucret = typeof o.dersUcreti === "number" ? o.dersUcreti : 0;
-      var dersSayisi = typeof o.dersSayisi === "number" ? o.dersSayisi : 0;
-      var odenen = typeof o.odenenToplam === "number" ? o.odenenToplam : 0;
+      var sinif = typeof o.sinif === "string" ? o.sinif : ""; // belirtilmemiş
 
-      var dersOlaylari = [];
-      for (var k = 0; k < dersSayisi; k++) dersOlaylari.push(ucret); // adet + tutar korunur
+      // Dersler: zaten dizi olarak varsa korunur; yoksa eski (dersSayisi × ücret) kurulur
+      var dersOlaylari;
+      if (Array.isArray(o.dersOlaylari)) {
+        dersOlaylari = o.dersOlaylari;
+      } else {
+        var eskiUcret = typeof o.dersUcreti === "number" ? o.dersUcreti : 0;
+        var eskiDersSayisi = typeof o.dersSayisi === "number" ? o.dersSayisi : 0;
+        dersOlaylari = [];
+        for (var k = 0; k < eskiDersSayisi; k++) dersOlaylari.push(eskiUcret);
+      }
+
+      var ucret = typeof o.guncelDersUcreti === "number" ? o.guncelDersUcreti
+                : (typeof o.dersUcreti === "number" ? o.dersUcreti : 0);
+
+      // Ödenmiş ders sayısı: yeni biçimde hazır; ara biçimde ödeme olaylarından;
+      // en eski biçimde "odenenToplam"dan türetilir.
+      var odenmis;
+      if (typeof o.odenmisDersSayisi === "number") {
+        odenmis = o.odenmisDersSayisi;
+      } else if (Array.isArray(o.odemeOlaylari)) {
+        odenmis = odemeyiDerslereCevir(dersOlaylari, topla(o.odemeOlaylari));
+      } else {
+        var odenen = typeof o.odenenToplam === "number" ? o.odenenToplam : 0;
+        odenmis = odemeyiDerslereCevir(dersOlaylari, odenen);
+      }
+      // Güvenlik: 0 .. ders sayısı arasında kalsın
+      if (odenmis < 0) odenmis = 0;
+      if (odenmis > dersOlaylari.length) odenmis = dersOlaylari.length;
 
       return {
         ad: o.ad,
         guncelDersUcreti: ucret,
-        sinif: typeof o.sinif === "string" ? o.sinif : "", // belirtilmemiş
+        sinif: sinif,
         dersOlaylari: dersOlaylari,
-        odemeOlaylari: tutariBol(odenen, ucret)
+        odenmisDersSayisi: odenmis
       };
     }
 
@@ -794,7 +817,12 @@
     }
     function dersSayisiOf(o)   { return o.dersOlaylari.length; }
     function borcToplamOf(o)   { return topla(o.dersOlaylari); }
-    function alinanToplamOf(o) { return topla(o.odemeOlaylari); }
+    // Alınan toplam: en eski (odenmisDersSayisi) dersin KENDİ fiyatları toplamı
+    function alinanToplamOf(o) {
+      var t = 0;
+      for (var i = 0; i < o.odenmisDersSayisi; i++) t += o.dersOlaylari[i];
+      return t;
+    }
 
     // Parayı "1.250 ₺" gibi okunaklı yazan küçük yardımcı
     function para(sayi) {
@@ -839,20 +867,20 @@
       var dersSayisi = dersSayisiOf(o);
       var borc = borcToplamOf(o);     // ders olaylarının tutarları toplamı
       var alinan = alinanToplamOf(o); // ödeme olaylarının tutarları toplamı
-      var kalan = borc - alinan;       // + borç, 0 temiz, - peşin
+      var kalan = borc - alinan;       // her zaman ≥ 0 (borç varsa kırmızı, yoksa yeşil)
 
       // Kalan değerinin gösterimi
       var kaldiSinif, kaldiYazi;
       if (kalan > 0) {
         kaldiSinif = "borc";
         kaldiYazi = "kalan " + para(kalan);
-      } else if (kalan === 0) {
-        kaldiSinif = "temiz";
-        kaldiYazi = "kalan 0 ₺";
       } else {
         kaldiSinif = "temiz";
-        kaldiYazi = para(-kalan) + " peşin";
+        kaldiYazi = "kalan 0 ₺";
       }
+
+      // Ödenmemiş ders kalmadıysa (ya da hiç ders yoksa) "Ödeme aldım" pasif
+      var odemeKapali = o.odenmisDersSayisi >= dersSayisi;
 
       return '<div class="ogrenci">' +
           '<div class="ust">' +
@@ -871,7 +899,7 @@
           '</div>' +
           '<div class="eylemler">' +
             '<button type="button" data-eylem="ders" data-index="' + index + '">Ders yapıldı</button>' +
-            '<button type="button" data-eylem="odeme" data-index="' + index + '">Ödeme aldım</button>' +
+            '<button type="button" data-eylem="odeme" data-index="' + index + '"' + (odemeKapali ? ' disabled' : '') + '>Ödeme aldım</button>' +
           '</div>' +
         '</div>';
     }
@@ -980,13 +1008,13 @@
         return;
       }
 
-      // Yeni öğrenci: hiç olay yok (0 ders, 0 ödeme)
+      // Yeni öğrenci: hiç ders yok, hiçbir ders ödenmemiş
       ogrenciler.push({
         ad: ad,
         guncelDersUcreti: ucret,
         sinif: sinif,
         dersOlaylari: [],
-        odemeOlaylari: []
+        odenmisDersSayisi: 0
       });
       ogrencileriYaz(ogrenciler); // kalıcı kayıt
       ciz();
@@ -998,8 +1026,10 @@
     function dersYapildi(o) {
       o.dersOlaylari.push(o.guncelDersUcreti);
     }
+    // En eski ödenmemiş dersi kapatır (tutarı o dersin kendi fiyatıdır).
+    // Ödenmemiş ders kalmadıysa hiçbir şey yapmaz.
     function odemeAldim(o) {
-      o.odemeOlaylari.push(o.guncelDersUcreti);
+      if (o.odenmisDersSayisi < o.dersOlaylari.length) o.odenmisDersSayisi++;
     }
 
     // Liste içindeki butonlara tek dinleyiciyle bağlan
@@ -1045,7 +1075,7 @@
       var o = ogrenciler[duzenleIndex];
       if (!o) return;
       dBtnDersGeri.disabled = o.dersOlaylari.length === 0;
-      dBtnOdemeGeri.disabled = o.odemeOlaylari.length === 0;
+      dBtnOdemeGeri.disabled = o.odenmisDersSayisi === 0;
     }
 
     // Durum özetini (ders / ödeme / kalan) güncel olaylardan tazele.
@@ -1055,9 +1085,9 @@
       if (!o) return;
       var dersSayisi = dersSayisiOf(o);
       var borc = borcToplamOf(o);           // ders olaylarının tutar toplamı
-      var odemeSayisi = o.odemeOlaylari.length;
-      var alinan = alinanToplamOf(o);       // ödeme olaylarının tutar toplamı
-      var kalan = borc - alinan;            // + borç, 0 temiz, - peşin
+      var odemeSayisi = o.odenmisDersSayisi; // ödenmiş ders sayısı
+      var alinan = alinanToplamOf(o);       // ödenmiş derslerin kendi fiyatları toplamı
+      var kalan = borc - alinan;            // her zaman ≥ 0
 
       dOzetDers.textContent = dersSayisi + " (toplam " + para(borc) + ")";
       dOzetOdeme.textContent = odemeSayisi + " kez (toplam " + para(alinan) + ")";
@@ -1067,12 +1097,9 @@
       if (kalan > 0) {
         dOzetKalan.classList.add("borc");
         dOzetKalan.textContent = para(kalan);
-      } else if (kalan === 0) {
-        dOzetKalan.classList.add("temiz");
-        dOzetKalan.textContent = "0 ₺";
       } else {
         dOzetKalan.classList.add("temiz");
-        dOzetKalan.textContent = para(-kalan) + " peşin";
+        dOzetKalan.textContent = "0 ₺";
       }
     }
 
@@ -1128,21 +1155,25 @@
       duzenleKapat();
     }
 
-    // En son ders olayını (kendi tutarıyla) sil; pencere açık kalır
+    // En son dersi sil; o ders ödenmişse ödenmiş sayı da düşer
+    // (ödenmiş ders sayısı, ders sayısını asla aşmaz). Pencere açık kalır.
     function dersGeriAl() {
       var o = ogrenciler[duzenleIndex];
       if (!o || o.dersOlaylari.length === 0) return;
       o.dersOlaylari.pop();
+      if (o.odenmisDersSayisi > o.dersOlaylari.length) {
+        o.odenmisDersSayisi = o.dersOlaylari.length;
+      }
       ogrencileriYaz(ogrenciler);
       ciz();
       geriAlButonlariniTazele();
       duzenleOzetTazele();
     }
-    // En son ödeme olayını (kendi tutarıyla) sil; pencere açık kalır
+    // Bir ödemeyi geri al: ödenmiş ders sayısını 1 azaltır; pencere açık kalır
     function odemeGeriAl() {
       var o = ogrenciler[duzenleIndex];
-      if (!o || o.odemeOlaylari.length === 0) return;
-      o.odemeOlaylari.pop();
+      if (!o || o.odenmisDersSayisi === 0) return;
+      o.odenmisDersSayisi--;
       ogrencileriYaz(ogrenciler);
       ciz();
       geriAlButonlariniTazele();
