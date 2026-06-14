@@ -70,7 +70,34 @@
 
     .baslik {
       margin: 6px 4px 22px;
+      /* Hamburger simgesini köşeye konumlamak için */
+      position: relative;
     }
+    /* Başlık köşesindeki sade hamburger (üç çizgi) düğmesi */
+    .menu-btn {
+      position: absolute;
+      top: 4px;
+      right: 0;
+      width: 44px;
+      height: 44px;
+      border: none;
+      background: transparent;
+      cursor: pointer;
+      display: flex;
+      flex-direction: column;
+      justify-content: center;
+      align-items: center;
+      gap: 5px;
+      padding: 0;
+    }
+    .menu-btn span {
+      display: block;
+      width: 24px;
+      height: 2px;
+      border-radius: 2px;
+      background: var(--kahve);
+    }
+    .menu-btn:active { transform: translateY(1px); }
     .baslik h1 {
       /* Serif yazı tipi sıcaklık katar */
       font-family: Georgia, "Times New Roman", "Cambria", serif;
@@ -432,6 +459,88 @@
       cursor: pointer;
     }
     .btn-sil:active { transform: translateY(1px); }
+
+    /* ---- Hamburger menüsü (küçük seçim penceresi) ---- */
+    /* Menü, perdenin üst-sağ köşesinde açılır; tasarımca kartlarla uyumlu */
+    .perde.menu { align-items: flex-start; justify-content: flex-end; }
+    .menu-panel {
+      background: var(--kart);
+      width: 100%;
+      max-width: 240px;
+      margin-top: 64px;
+      border-radius: 16px;
+      padding: 8px;
+      box-shadow: 0 12px 40px rgba(65, 36, 2, 0.25);
+    }
+    .menu-panel button {
+      display: block;
+      width: 100%;
+      text-align: left;
+      border: none;
+      background: transparent;
+      color: var(--kahve-koyu);
+      font-size: 16px;
+      padding: 14px 14px;
+      border-radius: 12px;
+      cursor: pointer;
+    }
+    .menu-panel button:active { background: var(--krem); }
+
+    /* ---- Hakkında penceresi ---- */
+    .hakkinda-panel h2 {
+      font-family: Georgia, "Times New Roman", "Cambria", serif;
+      margin: 0 0 4px;
+      font-size: 26px;
+      color: var(--kahve-koyu);
+    }
+    .hakkinda-panel .aciklama {
+      color: var(--kahve);
+      font-size: 15px;
+      margin: 0 0 18px;
+    }
+    .hakkinda-satir {
+      font-size: 14px;
+      color: var(--kahve-koyu);
+      margin-bottom: 12px;
+    }
+    .hakkinda-satir .etiket {
+      display: block;
+      font-size: 12px;
+      color: var(--soluk);
+      margin-bottom: 3px;
+    }
+    /* E-posta: kopyalanabilir düz metin (seçime izin ver) + mailto bağlantısı */
+    .hakkinda-eposta {
+      color: var(--amber);
+      font-weight: 600;
+      text-decoration: none;
+      word-break: break-all;
+      -webkit-user-select: text;
+      user-select: text;
+    }
+    .hakkinda-panel .telif {
+      margin-top: 22px;
+      text-align: center;
+      font-size: 12px;
+      color: var(--soluk);
+    }
+    /* Hakkında kapat (×) düğmesi — sağ üst köşe */
+    .hakkinda-panel { position: relative; }
+    .kapat-x {
+      position: absolute;
+      top: 14px;
+      right: 14px;
+      width: 32px;
+      height: 32px;
+      border: none;
+      background: transparent;
+      color: var(--soluk);
+      font-size: 22px;
+      line-height: 1;
+      cursor: pointer;
+      padding: 0;
+    }
+    .kapat-x:active { transform: translateY(1px); }
   </style>
 </head>
 <body>
@@ -439,6 +548,9 @@
     <div class="baslik">
       <h1>Defter</h1>
       <p>Özel ders kazanç takibi</p>
+      <button type="button" class="menu-btn" id="menu-btn" aria-label="Menü" title="Menü">
+        <span></span><span></span><span></span>
+      </button>
     </div>
 
     <!-- Özet kartları -->
@@ -562,6 +674,35 @@
       </div>
 
       <button type="button" class="btn-sil" id="d-btn-sil">Öğrenciyi sil</button>
+    </div>
+  </div>
+
+  <!-- Hamburger menüsü (açılır seçim penceresi) -->
+  <div class="perde menu" id="perde-menu">
+    <div class="menu-panel">
+      <button type="button" id="menu-hakkinda">Hakkında</button>
+      <button type="button" id="menu-geribildirim">Geri bildirim gönder</button>
+    </div>
+  </div>
+
+  <!-- Hakkında penceresi -->
+  <div class="perde" id="perde-hakkinda">
+    <div class="form-panel hakkinda-panel">
+      <button type="button" class="kapat-x" id="hakkinda-kapat" aria-label="Kapat" title="Kapat">×</button>
+
+      <h2>Defter</h2>
+      <p class="aciklama">Özel ders veren öğretmenler için sade kazanç ve ödeme takibi.</p>
+
+      <div class="hakkinda-satir">
+        <span class="etiket">Geliştirici</span>
+        SilentVariable-Studio
+      </div>
+      <div class="hakkinda-satir">
+        <span class="etiket">İletişim</span>
+        <a class="hakkinda-eposta" href="mailto:silentvariable.contact@gmail.com">silentvariable.contact@gmail.com</a>
+      </div>
+
+      <div class="telif">© 2026 SilentVariable-Studio</div>
     </div>
   </div>
 
@@ -1038,6 +1179,40 @@
     dBtnOdemeGeri.addEventListener("click", odemeGeriAl);
     perdeDuzenle.addEventListener("click", function (e) {
       if (e.target === perdeDuzenle) duzenleKapat();
+    });
+
+    // ---- Hamburger menüsü / Hakkında / Geri bildirim ----
+    var perdeMenu = document.getElementById("perde-menu");
+    var perdeHakkinda = document.getElementById("perde-hakkinda");
+    // Geri bildirim adresi ve hazır konu satırı (mailto)
+    var GERIBILDIRIM_MAILTO =
+      "mailto:silentvariable.contact@gmail.com?subject=" +
+      encodeURIComponent("Defter — Geri bildirim");
+
+    function menuAc()    { perdeMenu.classList.add("acik"); }
+    function menuKapat() { perdeMenu.classList.remove("acik"); }
+    function hakkindaAc()    { perdeHakkinda.classList.add("acik"); }
+    function hakkindaKapat() { perdeHakkinda.classList.remove("acik"); }
+
+    document.getElementById("menu-btn").addEventListener("click", menuAc);
+    // Menü dışına (perdenin boşluğuna) dokununca kapansın
+    perdeMenu.addEventListener("click", function (e) {
+      if (e.target === perdeMenu) menuKapat();
+    });
+
+    document.getElementById("menu-hakkinda").addEventListener("click", function () {
+      menuKapat();
+      hakkindaAc();
+    });
+    document.getElementById("menu-geribildirim").addEventListener("click", function () {
+      menuKapat();
+      // Cihazda e-posta uygulaması ayarlıysa hazır (adres + konu dolu) açar
+      window.location.href = GERIBILDIRIM_MAILTO;
+    });
+
+    document.getElementById("hakkinda-kapat").addEventListener("click", hakkindaKapat);
+    perdeHakkinda.addEventListener("click", function (e) {
+      if (e.target === perdeHakkinda) hakkindaKapat();
     });
 
     // İlk çizim
