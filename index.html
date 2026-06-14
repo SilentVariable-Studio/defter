@@ -105,6 +105,17 @@
       letter-spacing: 0.6px;
     }
 
+    /* Liste içi sınıf grubu başlığı ("9. sınıf" vb.) — liste-baslik ile aynı stil */
+    .grup-baslik {
+      font-size: 13px;
+      color: var(--kahve);
+      margin: 22px 4px 12px;
+      text-transform: uppercase;
+      letter-spacing: 0.6px;
+    }
+    /* İlk grubun üstünde fazladan boşluk olmasın */
+    .grup-baslik:first-child { margin-top: 4px; }
+
     .ogrenci {
       background: var(--kart);
       border-radius: 14px;
@@ -279,6 +290,20 @@
       outline: none;
       border-color: var(--amber);
     }
+    /* Sınıf düzeyi açılır menüsü — metin alanlarıyla aynı görünüm */
+    .form-alan select {
+      width: 100%;
+      padding: 13px 14px;
+      border: 1px solid #e6d9c2;
+      border-radius: 12px;
+      font-size: 16px;
+      background: #fffdf9;
+      color: var(--kahve-koyu);
+    }
+    .form-alan select:focus {
+      outline: none;
+      border-color: var(--amber);
+    }
 
     /* Doğrulama uyarısı */
     .uyari {
@@ -429,7 +454,23 @@
 
       <div class="form-alan">
         <label for="alan-ad">Öğrenci adı</label>
-        <input type="text" id="alan-ad" placeholder="Örn. Ayşe Yılmaz" autocomplete="off" />
+        <input type="text" id="alan-ad" placeholder="Örn. Erkan Sarıkaya" autocomplete="off" />
+      </div>
+      <div class="form-alan">
+        <label for="alan-sinif">Sınıf düzeyi</label>
+        <select id="alan-sinif">
+          <option value="" disabled selected>Sınıf seçin</option>
+          <option value="5">5. sınıf</option>
+          <option value="6">6. sınıf</option>
+          <option value="7">7. sınıf</option>
+          <option value="8">8. sınıf</option>
+          <option value="9">9. sınıf</option>
+          <option value="10">10. sınıf</option>
+          <option value="11">11. sınıf</option>
+          <option value="12">12. sınıf</option>
+          <option value="Mezun">Mezun</option>
+          <option value="Diğer">Diğer</option>
+        </select>
       </div>
       <div class="form-alan">
         <label for="alan-ucret">Ders ücreti (₺)</label>
@@ -479,6 +520,22 @@
         <input type="text" id="d-ad" autocomplete="off" />
       </div>
       <div class="form-alan">
+        <label for="d-sinif">Sınıf düzeyi</label>
+        <select id="d-sinif">
+          <option value="" disabled>Sınıf seçin</option>
+          <option value="5">5. sınıf</option>
+          <option value="6">6. sınıf</option>
+          <option value="7">7. sınıf</option>
+          <option value="8">8. sınıf</option>
+          <option value="9">9. sınıf</option>
+          <option value="10">10. sınıf</option>
+          <option value="11">11. sınıf</option>
+          <option value="12">12. sınıf</option>
+          <option value="Mezun">Mezun</option>
+          <option value="Diğer">Diğer</option>
+        </select>
+      </div>
+      <div class="form-alan">
         <label for="d-ucret">Ders ücreti (₺)</label>
         <input type="number" id="d-ucret" inputmode="numeric" min="0" />
         <div class="form-not">Bu ücret yalnızca bundan sonraki derslere uygulanır.</div>
@@ -499,6 +556,7 @@
     //  Her öğrenci (yeni biçim):
     //    {
     //      ad,
+    //      sinif,                     // "5".."12" | "Mezun" | "Diğer" | "" (belirtilmemiş)
     //      guncelDersUcreti,          // yeni olaylar bu fiyattan eklenir
     //      dersOlaylari:  [tutar, ...],  // her "Ders yapıldı" basışı
     //      odemeOlaylari: [tutar, ...]   // her "Ödeme aldım" basışı
@@ -527,12 +585,14 @@
     }
 
     // Eski biçimdeki bir öğrenciyi yeni biçime dönüştür (sayılar aynen korunur).
+    // sinif alanı yoksa "" (belirtilmemiş) sayılır; sayılar/işlemler korunur.
     function gocEt(o) {
       // Zaten yeni biçimdeyse sadece eksik alanı tamamla
       if (Array.isArray(o.dersOlaylari) && Array.isArray(o.odemeOlaylari)) {
         if (typeof o.guncelDersUcreti !== "number") {
           o.guncelDersUcreti = typeof o.dersUcreti === "number" ? o.dersUcreti : 0;
         }
+        if (typeof o.sinif !== "string") o.sinif = ""; // eski kayıt: belirtilmemiş
         return o;
       }
       var ucret = typeof o.dersUcreti === "number" ? o.dersUcreti : 0;
@@ -545,6 +605,7 @@
       return {
         ad: o.ad,
         guncelDersUcreti: ucret,
+        sinif: typeof o.sinif === "string" ? o.sinif : "", // belirtilmemiş
         dersOlaylari: dersOlaylari,
         odemeOlaylari: tutariBol(odenen, ucret)
       };
@@ -604,6 +665,17 @@
         .replace(/&/g, "&amp;")
         .replace(/</g, "&lt;")
         .replace(/>/g, "&gt;");
+    }
+
+    // ---- Sınıf grupları ----
+    // Liste bu sırayla gruplanır: 5→12, sonra Mezun, Diğer, en sonda belirtilmemiş ("")
+    var SINIF_SIRASI = ["5", "6", "7", "8", "9", "10", "11", "12", "Mezun", "Diğer", ""];
+
+    // Bir sınıf kodunu grup başlığına çevir
+    function grupBasligiOf(sinif) {
+      if (sinif === "") return "Sınıf belirtilmemiş";
+      if (sinif === "Mezun" || sinif === "Diğer") return sinif;
+      return sinif + ". sınıf";
     }
 
     // Tek bir öğrenci kartının HTML'ini üret (gerçek dizideki sırası: index)
@@ -689,9 +761,18 @@
         return;
       }
 
+      // Sınıfa göre grupla. Grup içi sıra zaten alfabetik (gosterilecek sıralı).
+      // Boş grubun başlığı gösterilmez; gruplar SINIF_SIRASI düzeninde dizilir.
       var html = "";
-      gosterilecek.forEach(function (kayit) {
-        html += ogrenciKartiHtml(kayit.o, kayit.i); // data-index gerçek dizinle
+      SINIF_SIRASI.forEach(function (sinifKodu) {
+        var grup = gosterilecek.filter(function (kayit) {
+          return (kayit.o.sinif || "") === sinifKodu;
+        });
+        if (grup.length === 0) return; // içinde öğrenci yoksa başlık yok
+        html += '<div class="grup-baslik">' + kacis(grupBasligiOf(sinifKodu)) + '</div>';
+        grup.forEach(function (kayit) {
+          html += ogrenciKartiHtml(kayit.o, kayit.i); // data-index gerçek dizinle
+        });
       });
       liste.innerHTML = html;
     }
@@ -699,11 +780,13 @@
     // ---- Form açma / kapama ----
     var perde = document.getElementById("perde");
     var alanAd = document.getElementById("alan-ad");
+    var alanSinif = document.getElementById("alan-sinif");
     var alanUcret = document.getElementById("alan-ucret");
     var uyari = document.getElementById("uyari");
 
     function formAc() {
       alanAd.value = "";
+      alanSinif.value = ""; // "Sınıf seçin" yönlendirmesine dön
       alanUcret.value = "";
       uyariGizle();
       perde.classList.add("acik");
@@ -723,12 +806,17 @@
     // ---- Kaydet ----
     function kaydet() {
       var ad = alanAd.value.trim();
+      var sinif = alanSinif.value;
       var ucretMetin = alanUcret.value.trim();
       var ucret = Number(ucretMetin);
 
       // Basit doğrulama
       if (ad === "") {
         uyariGoster("Lütfen öğrenci adını yaz.");
+        return;
+      }
+      if (sinif === "") {
+        uyariGoster("Lütfen sınıf düzeyini seç.");
         return;
       }
       if (ucretMetin === "" || isNaN(ucret) || ucret < 0) {
@@ -740,6 +828,7 @@
       ogrenciler.push({
         ad: ad,
         guncelDersUcreti: ucret,
+        sinif: sinif,
         dersOlaylari: [],
         odemeOlaylari: []
       });
@@ -785,6 +874,7 @@
     // ---- Düzenleme / silme ----
     var perdeDuzenle = document.getElementById("perde-duzenle");
     var dAd = document.getElementById("d-ad");
+    var dSinif = document.getElementById("d-sinif");
     var dUcret = document.getElementById("d-ucret");
     var dUyari = document.getElementById("d-uyari");
     var dBtnDersGeri = document.getElementById("d-btn-ders-geri");
@@ -834,6 +924,7 @@
       duzenleIndex = i;
       var o = ogrenciler[i];
       dAd.value = o.ad;
+      dSinif.value = o.sinif || ""; // mevcut sınıf seçili gelsin (yoksa "Sınıf seçin")
       dUcret.value = o.guncelDersUcreti;
       dUyari.classList.remove("gorun");
       geriAlButonlariniTazele();
@@ -855,11 +946,16 @@
       if (!o) return;
 
       var ad = dAd.value.trim();
+      var sinif = dSinif.value;
       var ucret = Number(dUcret.value.trim());
 
-      // Doğrulama (yalnızca ad ve ders ücreti)
+      // Doğrulama (ad, sınıf düzeyi ve ders ücreti)
       if (ad === "") {
         dUyariGoster("Lütfen öğrenci adını yaz.");
+        return;
+      }
+      if (sinif === "") {
+        dUyariGoster("Lütfen sınıf düzeyini seç.");
         return;
       }
       if (dUcret.value.trim() === "" || isNaN(ucret) || ucret < 0) {
@@ -868,6 +964,7 @@
       }
 
       o.ad = ad;
+      o.sinif = sinif;            // eski "belirtilmemiş" kayıtlar böyle sınıflanır
       o.guncelDersUcreti = ucret; // yalnızca bundan sonraki olayları etkiler
 
       ogrencileriYaz(ogrenciler); // kalıcı kayıt
