@@ -165,6 +165,20 @@
     }
     .ogrenci .eylemler button:active { transform: translateY(1px); }
 
+    /* ---- Arama kutusu ---- */
+    .arama {
+      width: 100%;
+      padding: 12px 14px;
+      margin-bottom: 12px;
+      border: 1px solid #e6d9c2;
+      border-radius: 12px;
+      font-size: 15px;
+      background: #fffdf9;
+      color: var(--kahve-koyu);
+    }
+    .arama::placeholder { color: var(--soluk); }
+    .arama:focus { outline: none; border-color: var(--amber); }
+
     /* ---- Boş durum mesajı ---- */
     .bos-durum {
       background: var(--kart);
@@ -348,6 +362,7 @@
     </div>
 
     <div class="liste-baslik">Öğrenciler</div>
+    <input type="text" id="arama" class="arama" placeholder="Öğrenci ara…" autocomplete="off" />
     <div id="liste"><!-- Öğrenci kartları buraya yazılır --></div>
 
     <button class="ekle-btn" type="button" id="ekle-btn">+ Öğrenci ekle</button>
@@ -499,6 +514,20 @@
       return sayi.toLocaleString("tr-TR") + " ₺";
     }
 
+    // Aramada karşılaştırmak için metni sadeleştir:
+    // küçük harfe çevir (Türkçe) ve ç/ğ/ı/ö/ş/ü harflerini sade karşılığına indir.
+    // Böylece "ayse" yazınca "Ayşe" de eşleşir, i/ı ayrımı kullanıcıyı uğraştırmaz.
+    function sadelestir(metin) {
+      return String(metin)
+        .toLocaleLowerCase("tr")
+        .replace(/ı/g, "i")
+        .replace(/ç/g, "c")
+        .replace(/ğ/g, "g")
+        .replace(/ö/g, "o")
+        .replace(/ş/g, "s")
+        .replace(/ü/g, "u");
+    }
+
     // Metni güvenli yazmak için (ad içindeki < > gibi karakterler)
     function kacis(metin) {
       return String(metin)
@@ -507,66 +536,94 @@
         .replace(/>/g, "&gt;");
     }
 
+    // Tek bir öğrenci kartının HTML'ini üret (gerçek dizideki sırası: index)
+    function ogrenciKartiHtml(o, index) {
+      var dersSayisi = dersSayisiOf(o);
+      var borc = borcToplamOf(o);     // ders olaylarının tutarları toplamı
+      var alinan = alinanToplamOf(o); // ödeme olaylarının tutarları toplamı
+      var kalan = borc - alinan;       // + borç, 0 temiz, - peşin
+
+      // Kalan değerinin gösterimi
+      var kaldiSinif, kaldiYazi;
+      if (kalan > 0) {
+        kaldiSinif = "borc";
+        kaldiYazi = "kalan " + para(kalan);
+      } else if (kalan === 0) {
+        kaldiSinif = "temiz";
+        kaldiYazi = "kalan 0 ₺";
+      } else {
+        kaldiSinif = "temiz";
+        kaldiYazi = para(-kalan) + " peşin";
+      }
+
+      return '<div class="ogrenci">' +
+          '<div class="ust">' +
+            '<div class="ad">' + kacis(o.ad) + '</div>' +
+            '<div class="ust-sag">' +
+              '<div class="ucret">' + para(o.guncelDersUcreti) + ' / ders</div>' +
+              '<button type="button" class="duzenle" data-eylem="duzenle" data-index="' + index + '" aria-label="Düzenle" title="Düzenle">✎</button>' +
+            '</div>' +
+          '</div>' +
+          '<div class="alt">' +
+            '<span>' + dersSayisi + ' ders</span>' +
+            '<span class="ayrac">·</span>' +
+            '<span>alınan ' + para(alinan) + '</span>' +
+            '<span class="ayrac">·</span>' +
+            '<span class="kaldi ' + kaldiSinif + '">' + kaldiYazi + '</span>' +
+          '</div>' +
+          '<div class="eylemler">' +
+            '<button type="button" data-eylem="ders" data-index="' + index + '">Ders yapıldı</button>' +
+            '<button type="button" data-eylem="odeme" data-index="' + index + '">Ödeme aldım</button>' +
+          '</div>' +
+        '</div>';
+    }
+
     // Ekranı (liste + özet kartları) çiz
     function ciz() {
       var liste = document.getElementById("liste");
-      var toplamKazanc = 0; // ödenen toplamların toplamı
-      var toplamAlacak = 0; // kalan borçların toplamı
 
+      // Özetler HER ZAMAN tüm öğrencilerden hesaplanır (aramadan etkilenmez)
+      var toplamKazanc = 0; // alınan ödemelerin toplamı
+      var toplamAlacak = 0; // borçlu kalanların toplamı
+      ogrenciler.forEach(function (o) {
+        var alinan = alinanToplamOf(o);
+        var kalan = borcToplamOf(o) - alinan;
+        toplamKazanc += alinan;
+        if (kalan > 0) toplamAlacak += kalan;
+      });
+      document.getElementById("ozet-kazanc").textContent = para(toplamKazanc);
+      document.getElementById("ozet-alacak").textContent = para(toplamAlacak);
+
+      // Hiç öğrenci yoksa boş durum mesajı
       if (ogrenciler.length === 0) {
         liste.innerHTML =
           '<div class="bos-durum">Henüz öğrenci yok.<br>Aşağıdaki + Öğrenci ekle ile başla.</div>';
-      } else {
-        var html = "";
-        ogrenciler.forEach(function (o, i) {
-          var dersSayisi = dersSayisiOf(o);
-          var borc = borcToplamOf(o);     // ders olaylarının tutarları toplamı
-          var alinan = alinanToplamOf(o); // ödeme olaylarının tutarları toplamı
-          var kalan = borc - alinan;       // + borç, 0 temiz, - peşin
-
-          toplamKazanc += alinan;
-          if (kalan > 0) toplamAlacak += kalan; // alacağa yalnızca borçları kat
-
-          // Kalan değerinin gösterimi
-          var kaldiSinif, kaldiYazi;
-          if (kalan > 0) {
-            kaldiSinif = "borc";
-            kaldiYazi = "kalan " + para(kalan);
-          } else if (kalan === 0) {
-            kaldiSinif = "temiz";
-            kaldiYazi = "kalan 0 ₺";
-          } else {
-            kaldiSinif = "temiz";
-            kaldiYazi = para(-kalan) + " peşin";
-          }
-
-          html +=
-            '<div class="ogrenci">' +
-              '<div class="ust">' +
-                '<div class="ad">' + kacis(o.ad) + '</div>' +
-                '<div class="ust-sag">' +
-                  '<div class="ucret">' + para(o.guncelDersUcreti) + ' / ders</div>' +
-                  '<button type="button" class="duzenle" data-eylem="duzenle" data-index="' + i + '" aria-label="Düzenle" title="Düzenle">✎</button>' +
-                '</div>' +
-              '</div>' +
-              '<div class="alt">' +
-                '<span>' + dersSayisi + ' ders</span>' +
-                '<span class="ayrac">·</span>' +
-                '<span>alınan ' + para(alinan) + '</span>' +
-                '<span class="ayrac">·</span>' +
-                '<span class="kaldi ' + kaldiSinif + '">' + kaldiYazi + '</span>' +
-              '</div>' +
-              '<div class="eylemler">' +
-                '<button type="button" data-eylem="ders" data-index="' + i + '">Ders yapıldı</button>' +
-                '<button type="button" data-eylem="odeme" data-index="' + i + '">Ödeme aldım</button>' +
-              '</div>' +
-            '</div>';
-        });
-        liste.innerHTML = html;
+        return;
       }
 
-      document.getElementById("ozet-kazanc").textContent = para(toplamKazanc);
-      document.getElementById("ozet-alacak").textContent = para(toplamAlacak);
+      // Gerçek dizinleri koruyarak süz (arama) ve ada göre Türkçe alfabetik sırala
+      var aranan = sadelestir(document.getElementById("arama").value.trim());
+      var gosterilecek = [];
+      ogrenciler.forEach(function (o, i) {
+        if (aranan === "" || sadelestir(o.ad).indexOf(aranan) !== -1) {
+          gosterilecek.push({ o: o, i: i });
+        }
+      });
+      gosterilecek.sort(function (a, b) {
+        return a.o.ad.localeCompare(b.o.ad, "tr", { sensitivity: "base" });
+      });
+
+      // Aramayla hiçbir öğrenci eşleşmediyse sade mesaj
+      if (gosterilecek.length === 0) {
+        liste.innerHTML = '<div class="bos-durum">Eşleşen öğrenci yok</div>';
+        return;
+      }
+
+      var html = "";
+      gosterilecek.forEach(function (kayit) {
+        html += ogrenciKartiHtml(kayit.o, kayit.i); // data-index gerçek dizinle
+      });
+      liste.innerHTML = html;
     }
 
     // ---- Form açma / kapama ----
@@ -745,6 +802,9 @@
       ciz();
       duzenleKapat();
     }
+
+    // Arama kutusuna yazdıkça listeyi anında süz (özetler değişmez)
+    document.getElementById("arama").addEventListener("input", ciz);
 
     // ---- Olay bağlantıları ----
     document.getElementById("ekle-btn").addEventListener("click", formAc);
