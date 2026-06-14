@@ -451,33 +451,57 @@
     /* "Düzeltme" başlığı, özetin hemen altında ilişkili dursun */
     .durum-ozet .duzelt-baslik { margin-top: 14px; }
 
-    /* ---- Geçmiş dersler listesi (düzenleme penceresi) ---- */
+    /* ---- Geçmiş dersler: açılır ajanda (düzenleme penceresi) ---- */
     .gecmis-dersler { margin-bottom: 16px; }
-    .gecmis-baslik {
-      font-size: 13px;
+    /* Açılır başlık düğmesi (varsayılan kapalı) */
+    .gecmis-ac {
+      width: 100%;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      gap: 12px;
+      border: 1px solid #e6d9c2;
+      border-radius: 12px;
+      background: #fffdf9;
       color: var(--kahve);
-      margin-bottom: 8px;
+      font-size: 14px;
+      font-weight: 600;
+      padding: 11px 14px;
+      cursor: pointer;
+    }
+    .gecmis-ac:active { transform: translateY(1px); }
+    .gecmis-ok { color: var(--soluk); font-size: 12px; }
+    /* Açılan gövde: dikey kaydırılan liste */
+    .gecmis-govde {
+      margin-top: 10px;
+      max-height: 260px;
+      overflow-y: auto;
     }
     .gecmis-bos {
       font-size: 13px;
       color: var(--soluk);
+      padding: 4px 2px;
     }
-    .gecmis-satir {
-      display: flex;
-      justify-content: space-between;
-      align-items: baseline;
-      gap: 12px;
+    /* Gün grubu: başlık + altında o günün dersleri */
+    .ajanda-gun { margin-bottom: 14px; }
+    .ajanda-gun:last-child { margin-bottom: 0; }
+    .ajanda-gun-baslik {
+      font-size: 13px;
+      font-weight: 700;
+      color: var(--kahve-koyu);
+      margin-bottom: 6px;
+    }
+    .ajanda-ders {
       font-size: 14px;
-      padding: 7px 0;
-      border-bottom: 1px solid #e6d9c2;
+      color: var(--kahve);
+      padding: 6px 0 6px 12px;
+      margin-bottom: 4px;
+      border-left: 2px solid #e6d9c2;
     }
-    .gecmis-satir:last-child { border-bottom: none; }
-    .gecmis-satir .tarih { color: var(--kahve-koyu); }
-    .gecmis-satir .tarih.yok { color: var(--soluk); font-style: italic; }
-    .gecmis-satir .tutar {
-      color: var(--soluk);
-      white-space: nowrap;
-    }
+    .ajanda-ders:last-child { margin-bottom: 0; }
+    /* Tarihsiz (eski) dersler en altta, sakin görünüm */
+    .ajanda-tarihsiz .ajanda-gun-baslik { color: var(--soluk); }
+    .ajanda-tarihsiz .ajanda-ders { color: var(--soluk); font-style: italic; }
 
     /* Düzenleme penceresindeki "Öğrenciyi sil" butonu (ayrı dursun) */
     .btn-sil {
@@ -689,10 +713,13 @@
         </div>
       </div>
 
-      <!-- Geçmiş dersler: tarih+saatiyle, en yeni en üstte (sadece bilgi) -->
+      <!-- Geçmiş dersler: açılır ajanda (varsayılan kapalı; sadece gösterim) -->
       <div class="gecmis-dersler">
-        <div class="gecmis-baslik">Geçmiş dersler</div>
-        <div id="d-gecmis-liste"></div>
+        <button type="button" class="gecmis-ac" id="d-gecmis-ac" aria-expanded="false">
+          <span id="d-gecmis-ac-yazi">Dersleri göster</span>
+          <span class="gecmis-ok" id="d-gecmis-ok">▾</span>
+        </button>
+        <div id="d-gecmis-liste" class="gecmis-govde" hidden></div>
       </div>
 
       <!-- Bilgiler -->
@@ -1154,7 +1181,20 @@
     var dOzetOdeme = document.getElementById("d-ozet-odeme");
     var dOzetKalan = document.getElementById("d-ozet-kalan");
     var dGecmisListe = document.getElementById("d-gecmis-liste");
+    var dGecmisAc = document.getElementById("d-gecmis-ac");
+    var dGecmisAcYazi = document.getElementById("d-gecmis-ac-yazi");
+    var dGecmisOk = document.getElementById("d-gecmis-ok");
     var duzenleIndex = -1; // hangi öğrenci düzenleniyor
+
+    // Açılır başlığa basınca ajandayı aç/kapat
+    dGecmisAc.addEventListener("click", function () {
+      var suAnKapali = dGecmisListe.hidden;
+      dGecmisListe.hidden = !suAnKapali;          // kapalıysa aç, açıksa kapat
+      dGecmisAc.classList.toggle("acik", suAnKapali);
+      dGecmisAc.setAttribute("aria-expanded", suAnKapali ? "true" : "false");
+      dGecmisAcYazi.textContent = suAnKapali ? "Dersleri gizle" : "Dersleri göster";
+      dGecmisOk.textContent = suAnKapali ? "▴" : "▾";
+    });
 
     // Bir ISO tarihi okunaklı "GG.AA.YYYY SS:DD" biçimine çevir.
     // Tarih yoksa/bozuksa null döndür (çağıran "tarih kaydedilmemiş" gösterir).
@@ -1168,28 +1208,77 @@
       });
     }
 
-    // Geçmiş dersleri tarih+saatiyle listele (en yeni en üstte). Sadece bilgi; paraya etkisi yok.
+    // Geçmiş dersleri TARİHE göre grupla ve ajanda olarak göster (en yeni gün en üstte).
+    // Sadece okuma/gösterim; ders-tarih verisinin yapısına dokunmaz, paraya etkisi yok.
     function gecmisDersleriCiz() {
       var o = ogrenciler[duzenleIndex];
       if (!o) return;
       var n = o.dersOlaylari.length;
       if (n === 0) {
-        dGecmisListe.innerHTML = '<div class="gecmis-bos">Henüz ders işaretlenmedi.</div>';
+        dGecmisListe.innerHTML = '<div class="gecmis-bos">Henüz ders kaydı yok.</div>';
         return;
       }
       var tarihler = Array.isArray(o.dersTarihleri) ? o.dersTarihleri : [];
-      var html = "";
-      for (var i = n - 1; i >= 0; i--) { // en yeni en üstte
-        var bicim = tarihBicimle(tarihler[i]);
-        var tarihHtml = bicim
-          ? '<span class="tarih">' + kacis(bicim) + '</span>'
-          : '<span class="tarih yok">tarih kaydedilmemiş</span>';
-        html += '<div class="gecmis-satir">' +
-                  tarihHtml +
-                  '<span class="tutar">' + para(o.dersOlaylari[i]) + '</span>' +
-                '</div>';
+
+      // Dersleri yerel güne göre grupla; tarihsizleri ayrı say
+      var gunler = {};   // key -> { gunZamani, ornek, dersZamanlari: [ms,...] }
+      var tarihsiz = 0;
+      for (var i = 0; i < n; i++) {
+        var iso = tarihler[i];
+        var d = iso ? new Date(iso) : null;
+        if (!d || isNaN(d.getTime())) { tarihsiz++; continue; }
+        var key = d.getFullYear() + "-" + d.getMonth() + "-" + d.getDate();
+        if (!gunler[key]) {
+          gunler[key] = {
+            gunZamani: new Date(d.getFullYear(), d.getMonth(), d.getDate()).getTime(),
+            ornek: d,
+            dersZamanlari: []
+          };
+        }
+        gunler[key].dersZamanlari.push(d.getTime());
       }
+
+      // Günleri en yeni en üstte sırala
+      var sirali = Object.keys(gunler).sort(function (a, b) {
+        return gunler[b].gunZamani - gunler[a].gunZamani;
+      });
+
+      var html = "";
+      sirali.forEach(function (key) {
+        var g = gunler[key];
+        var gunYazi = g.ornek.toLocaleDateString("tr-TR", { day: "numeric", month: "long", year: "numeric" });
+        var haftaGunu = g.ornek.toLocaleDateString("tr-TR", { weekday: "long" });
+        html += '<div class="ajanda-gun">' +
+                  '<div class="ajanda-gun-baslik">' + kacis(gunYazi + ", " + haftaGunu) + '</div>';
+        // Gün içi dersler de en yeni en üstte
+        g.dersZamanlari.sort(function (a, b) { return b - a; });
+        g.dersZamanlari.forEach(function (ms) {
+          var saat = new Date(ms).toLocaleTimeString("tr-TR", { hour: "2-digit", minute: "2-digit" });
+          html += '<div class="ajanda-ders">' + kacis(saat) + ' — ders yapıldı</div>';
+        });
+        html += '</div>';
+      });
+
+      // Tarihsiz (eski) dersler en altta, nazikçe
+      if (tarihsiz > 0) {
+        html += '<div class="ajanda-gun ajanda-tarihsiz">' +
+                  '<div class="ajanda-gun-baslik">Tarihsiz dersler</div>';
+        for (var t = 0; t < tarihsiz; t++) {
+          html += '<div class="ajanda-ders">ders yapıldı</div>';
+        }
+        html += '</div>';
+      }
+
       dGecmisListe.innerHTML = html;
+    }
+
+    // Açılır ajandayı kapalı duruma getir (her öğrenci açılışında varsayılan)
+    function gecmisKapat() {
+      dGecmisListe.hidden = true;
+      dGecmisAc.classList.remove("acik");
+      dGecmisAc.setAttribute("aria-expanded", "false");
+      dGecmisAcYazi.textContent = "Dersleri göster";
+      dGecmisOk.textContent = "▾";
     }
 
     // Geri alma butonlarını, olay var/yok durumuna göre etkin/pasif yap
@@ -1234,7 +1323,8 @@
       dUyari.classList.remove("gorun");
       geriAlButonlariniTazele();
       duzenleOzetTazele();
-      gecmisDersleriCiz(); // geçmiş dersleri tarih+saatiyle göster
+      gecmisDersleriCiz(); // geçmiş dersleri ajanda olarak hazırla
+      gecmisKapat();       // her açılışta ajanda varsayılan kapalı
       perdeDuzenle.classList.add("acik");
       // Otomatik odaklanma yok: klavye yalnızca kullanıcı alana dokununca açılsın
     }
