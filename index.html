@@ -503,6 +503,59 @@
     .ajanda-tarihsiz .ajanda-gun-baslik { color: var(--soluk); }
     .ajanda-tarihsiz .ajanda-ders { color: var(--soluk); font-style: italic; }
 
+    /* PLANLI ders: yapılmıştan NET ayrı (soluk + kesik kenar + "planlı" etiketi) */
+    .ajanda-ders.planli {
+      color: var(--soluk);
+      border-left-style: dashed;
+    }
+    .ajanda-etiket { font-style: italic; }
+
+    /* ---- Düzenli ders planı eylemleri (düzenleme penceresi) ---- */
+    .plan-eylem { margin-bottom: 16px; }
+    .plan-ac-btn {
+      width: 100%;
+      border: 1px solid #e6d9c2;
+      border-radius: 12px;
+      background: #fffdf9;
+      color: var(--kahve);
+      font-size: 14px;
+      font-weight: 600;
+      padding: 11px 14px;
+      cursor: pointer;
+    }
+    .plan-ac-btn:active { transform: translateY(1px); }
+    .plan-iptal-btn {
+      width: 100%;
+      margin-top: 8px;
+      border: none;
+      background: transparent;
+      color: var(--kirmizi);
+      font-size: 13px;
+      font-weight: 600;
+      padding: 8px;
+      cursor: pointer;
+    }
+    .plan-iptal-btn:active { transform: translateY(1px); }
+
+    /* ---- Plan penceresi: haftanın günleri (çoklu seçim, hap düğmeler) ---- */
+    .plan-gunler { display: flex; flex-wrap: wrap; gap: 6px; }
+    .plan-gun {
+      border: 1px solid #e6d9c2;
+      background: #fffdf9;
+      color: var(--kahve);
+      border-radius: 999px;
+      padding: 8px 12px;
+      font-size: 13px;
+      font-weight: 600;
+      cursor: pointer;
+    }
+    .plan-gun.secili {
+      background: var(--amber);
+      color: #fff;
+      border-color: var(--amber);
+    }
+    .plan-gun:active { transform: translateY(1px); }
+
     /* Düzenleme penceresindeki "Öğrenciyi sil" butonu (ayrı dursun) */
     .btn-sil {
       width: 100%;
@@ -722,6 +775,12 @@
         <div id="d-gecmis-liste" class="gecmis-govde" hidden></div>
       </div>
 
+      <!-- Düzenli ders planı (planlı dersler; paradan tamamen ayrı) -->
+      <div class="plan-eylem">
+        <button type="button" class="plan-ac-btn" id="d-plan-ac">Düzenli ders planla</button>
+        <button type="button" class="plan-iptal-btn" id="d-plan-iptal" hidden>Planlı dersleri iptal et</button>
+      </div>
+
       <!-- Bilgiler -->
       <div class="form-alan">
         <label for="d-ad">Öğrenci adı</label>
@@ -806,6 +865,44 @@
     </div>
   </div>
 
+  <!-- Düzenli ders planlama penceresi (planlı dersler; paraya etkisi yok) -->
+  <div class="perde" id="perde-plan">
+    <div class="form-panel">
+      <h2>Düzenli ders planla</h2>
+
+      <div class="uyari" id="plan-uyari"></div>
+
+      <div class="form-alan">
+        <label>Hangi günler</label>
+        <div class="plan-gunler" id="plan-gunler">
+          <button type="button" class="plan-gun" data-gun="1">Pzt</button>
+          <button type="button" class="plan-gun" data-gun="2">Sal</button>
+          <button type="button" class="plan-gun" data-gun="3">Çar</button>
+          <button type="button" class="plan-gun" data-gun="4">Per</button>
+          <button type="button" class="plan-gun" data-gun="5">Cum</button>
+          <button type="button" class="plan-gun" data-gun="6">Cmt</button>
+          <button type="button" class="plan-gun" data-gun="0">Paz</button>
+        </div>
+      </div>
+
+      <div class="form-alan">
+        <label for="plan-saat">Saat</label>
+        <input type="time" id="plan-saat" value="18:00" />
+      </div>
+
+      <div class="form-alan">
+        <label for="plan-hafta">Kaç hafta</label>
+        <input type="number" id="plan-hafta" min="1" max="52" value="12" inputmode="numeric" autocomplete="off" />
+        <div class="form-not">Yaklaşık 3 ay = 12 hafta.</div>
+      </div>
+
+      <div class="form-butonlar">
+        <button type="button" class="btn-vazgec" id="plan-vazgec">Vazgeç</button>
+        <button type="button" class="btn-kaydet" id="plan-kaydet">Planla</button>
+      </div>
+    </div>
+  </div>
+
   <script>
     // =========================================================
     //  KALICI KAYIT — öğrenciler cihazda localStorage'da saklanır.
@@ -818,6 +915,8 @@
     //      dersTarihleri: [ISO|null, ...], // her dersin tarih+saati (dersOlaylari ile AYNI sırada/uzunlukta;
     //                                      // eski/tarihsiz dersler için null). SADECE bilgi; paraya etkisi yok.
     //      odenmisDersSayisi       // en eski derslerden kaçının ödendiği (0 .. dersOlaylari.length)
+    //      planliDersler: [ISO, ...]  // PLANLI (henüz yapılmamış) dersler — tarih+saat.
+    //                                 // YAPILMIŞ derslerden ve PARADAN tamamen ayrı; hesaba girmez.
     //    }
     //  Ödeme, en eski ödenmemiş dersi O DERSİN kendi fiyatından kapatır (güncel ücret değil).
     //    ders sayısı   = dersOlaylari.length
@@ -886,13 +985,20 @@
         : [];
       while (dersTarihleri.length < dersOlaylari.length) dersTarihleri.push(null);
 
+      // Planlı dersler: YAPILMIŞ derslerden ve paradan TAMAMEN ayrı.
+      // Sadece tarih+saat (ISO) tutan bağımsız bir liste. Paraya/FIFO'ya etkisi yok.
+      var planliDersler = Array.isArray(o.planliDersler)
+        ? o.planliDersler.filter(function (x) { return typeof x === "string"; })
+        : [];
+
       return {
         ad: o.ad,
         guncelDersUcreti: ucret,
         sinif: sinif,
         dersOlaylari: dersOlaylari,
         dersTarihleri: dersTarihleri,
-        odenmisDersSayisi: odenmis
+        odenmisDersSayisi: odenmis,
+        planliDersler: planliDersler
       };
     }
 
@@ -1121,7 +1227,8 @@
         sinif: sinif,
         dersOlaylari: [],
         dersTarihleri: [], // dersOlaylari ile hizalı kalır
-        odenmisDersSayisi: 0
+        odenmisDersSayisi: 0,
+        planliDersler: []  // planlı dersler ayrı; paraya etkisi yok
       });
       ogrencileriYaz(ogrenciler); // kalıcı kayıt
       ciz();
@@ -1184,16 +1291,26 @@
     var dGecmisAc = document.getElementById("d-gecmis-ac");
     var dGecmisAcYazi = document.getElementById("d-gecmis-ac-yazi");
     var dGecmisOk = document.getElementById("d-gecmis-ok");
+    var dPlanIptal = document.getElementById("d-plan-iptal");
     var duzenleIndex = -1; // hangi öğrenci düzenleniyor
 
-    // Açılır başlığa basınca ajandayı aç/kapat
+    // Ajandayı aç / kapat (görünüm durumunu tek yerden yönet)
+    function gecmisAc() {
+      dGecmisListe.hidden = false;
+      dGecmisAc.classList.add("acik");
+      dGecmisAc.setAttribute("aria-expanded", "true");
+      dGecmisAcYazi.textContent = "Dersleri gizle";
+      dGecmisOk.textContent = "▴";
+    }
+    function gecmisKapat() {
+      dGecmisListe.hidden = true;
+      dGecmisAc.classList.remove("acik");
+      dGecmisAc.setAttribute("aria-expanded", "false");
+      dGecmisAcYazi.textContent = "Dersleri göster";
+      dGecmisOk.textContent = "▾";
+    }
     dGecmisAc.addEventListener("click", function () {
-      var suAnKapali = dGecmisListe.hidden;
-      dGecmisListe.hidden = !suAnKapali;          // kapalıysa aç, açıksa kapat
-      dGecmisAc.classList.toggle("acik", suAnKapali);
-      dGecmisAc.setAttribute("aria-expanded", suAnKapali ? "true" : "false");
-      dGecmisAcYazi.textContent = suAnKapali ? "Dersleri gizle" : "Dersleri göster";
-      dGecmisOk.textContent = suAnKapali ? "▴" : "▾";
+      if (dGecmisListe.hidden) gecmisAc(); else gecmisKapat();
     });
 
     // Bir ISO tarihi okunaklı "GG.AA.YYYY SS:DD" biçimine çevir.
@@ -1208,34 +1325,53 @@
       });
     }
 
-    // Geçmiş dersleri TARİHE göre grupla ve ajanda olarak göster (en yeni gün en üstte).
-    // Sadece okuma/gösterim; ders-tarih verisinin yapısına dokunmaz, paraya etkisi yok.
+    // Ajandayı çiz: YAPILMIŞ ve PLANLI dersleri TARİHE göre gruplar (en yeni gün üstte).
+    // Planlı dersler "planlı" diye ayrı işaretlenir. Sadece okuma/gösterim; paraya etkisi yok.
     function gecmisDersleriCiz() {
       var o = ogrenciler[duzenleIndex];
       if (!o) return;
-      var n = o.dersOlaylari.length;
-      if (n === 0) {
-        dGecmisListe.innerHTML = '<div class="gecmis-bos">Henüz ders kaydı yok.</div>';
-        return;
-      }
-      var tarihler = Array.isArray(o.dersTarihleri) ? o.dersTarihleri : [];
 
-      // Dersleri yerel güne göre grupla; tarihsizleri ayrı say
-      var gunler = {};   // key -> { gunZamani, ornek, dersZamanlari: [ms,...] }
-      var tarihsiz = 0;
-      for (var i = 0; i < n; i++) {
-        var iso = tarihler[i];
-        var d = iso ? new Date(iso) : null;
-        if (!d || isNaN(d.getTime())) { tarihsiz++; continue; }
+      var tarihler = Array.isArray(o.dersTarihleri) ? o.dersTarihleri : [];
+      var planlar = Array.isArray(o.planliDersler) ? o.planliDersler : [];
+      var yapilmisN = o.dersOlaylari.length;
+
+      // İptal düğmesi yalnızca planlı ders varken görünür
+      dPlanIptal.hidden = planlar.length === 0;
+
+      // Günlere grupla (yerel gün). Her güne hem yapılmış hem planlı dersler girebilir.
+      var gunler = {};   // key -> { gunZamani, ornek, ogeler: [ {ms, tip} ] }
+      var tarihsiz = 0;  // tarihi olmayan (eski) YAPILMIŞ dersler
+      function guneEkle(ms, tip) {
+        var d = new Date(ms);
         var key = d.getFullYear() + "-" + d.getMonth() + "-" + d.getDate();
         if (!gunler[key]) {
           gunler[key] = {
             gunZamani: new Date(d.getFullYear(), d.getMonth(), d.getDate()).getTime(),
             ornek: d,
-            dersZamanlari: []
+            ogeler: []
           };
         }
-        gunler[key].dersZamanlari.push(d.getTime());
+        gunler[key].ogeler.push({ ms: ms, tip: tip });
+      }
+
+      // Yapılmış dersler (tarihsizler ayrı sayılır)
+      for (var i = 0; i < yapilmisN; i++) {
+        var iso = tarihler[i];
+        var d1 = iso ? new Date(iso) : null;
+        if (!d1 || isNaN(d1.getTime())) { tarihsiz++; continue; }
+        guneEkle(d1.getTime(), "yapildi");
+      }
+      // Planlı dersler (ayrı veri; paraya girmez)
+      for (var p = 0; p < planlar.length; p++) {
+        var d2 = new Date(planlar[p]);
+        if (isNaN(d2.getTime())) continue;
+        guneEkle(d2.getTime(), "planli");
+      }
+
+      // Hiç bir şey yoksa sakin boş durum
+      if (Object.keys(gunler).length === 0 && tarihsiz === 0) {
+        dGecmisListe.innerHTML = '<div class="gecmis-bos">Henüz ders kaydı yok.</div>';
+        return;
       }
 
       // Günleri en yeni en üstte sırala
@@ -1250,16 +1386,21 @@
         var haftaGunu = g.ornek.toLocaleDateString("tr-TR", { weekday: "long" });
         html += '<div class="ajanda-gun">' +
                   '<div class="ajanda-gun-baslik">' + kacis(gunYazi + ", " + haftaGunu) + '</div>';
-        // Gün içi dersler de en yeni en üstte
-        g.dersZamanlari.sort(function (a, b) { return b - a; });
-        g.dersZamanlari.forEach(function (ms) {
-          var saat = new Date(ms).toLocaleTimeString("tr-TR", { hour: "2-digit", minute: "2-digit" });
-          html += '<div class="ajanda-ders">' + kacis(saat) + ' — ders yapıldı</div>';
+        // Gün içi öğeler de en yeni en üstte
+        g.ogeler.sort(function (a, b) { return b.ms - a.ms; });
+        g.ogeler.forEach(function (oge) {
+          var saat = new Date(oge.ms).toLocaleTimeString("tr-TR", { hour: "2-digit", minute: "2-digit" });
+          if (oge.tip === "planli") {
+            html += '<div class="ajanda-ders planli">' + kacis(saat) +
+                    ' — <span class="ajanda-etiket">planlı</span></div>';
+          } else {
+            html += '<div class="ajanda-ders">' + kacis(saat) + ' — ders yapıldı</div>';
+          }
         });
         html += '</div>';
       });
 
-      // Tarihsiz (eski) dersler en altta, nazikçe
+      // Tarihsiz (eski) YAPILMIŞ dersler en altta, nazikçe
       if (tarihsiz > 0) {
         html += '<div class="ajanda-gun ajanda-tarihsiz">' +
                   '<div class="ajanda-gun-baslik">Tarihsiz dersler</div>';
@@ -1272,14 +1413,93 @@
       dGecmisListe.innerHTML = html;
     }
 
-    // Açılır ajandayı kapalı duruma getir (her öğrenci açılışında varsayılan)
-    function gecmisKapat() {
-      dGecmisListe.hidden = true;
-      dGecmisAc.classList.remove("acik");
-      dGecmisAc.setAttribute("aria-expanded", "false");
-      dGecmisAcYazi.textContent = "Dersleri göster";
-      dGecmisOk.textContent = "▾";
+    // ---- Düzenli ders planı (planlı dersler — paradan/FIFO'dan TAMAMEN ayrı) ----
+    var perdePlan = document.getElementById("perde-plan");
+    var planGunlerKutu = document.getElementById("plan-gunler");
+    var planSaat = document.getElementById("plan-saat");
+    var planHafta = document.getElementById("plan-hafta");
+    var planUyari = document.getElementById("plan-uyari");
+
+    function planUyariGoster(mesaj) {
+      planUyari.textContent = mesaj;
+      planUyari.classList.add("gorun");
     }
+    function planAc() {
+      // Formu sıfırla
+      var dugmeler = planGunlerKutu.querySelectorAll(".plan-gun");
+      for (var i = 0; i < dugmeler.length; i++) dugmeler[i].classList.remove("secili");
+      planSaat.value = "18:00";
+      planHafta.value = "12";
+      planUyari.classList.remove("gorun");
+      perdePlan.classList.add("acik");
+    }
+    function planKapat() {
+      perdePlan.classList.remove("acik");
+    }
+
+    // Gün düğmeleri: çoklu seçim (aç/kapat)
+    planGunlerKutu.addEventListener("click", function (e) {
+      var btn = e.target.closest(".plan-gun");
+      if (!btn) return;
+      btn.classList.toggle("secili");
+    });
+
+    // Plana göre planlı ders kayıtları üret: bugünden itibaren, seçilen günler/saatte,
+    // tam N hafta boyunca. Her kayıt SADECE tarih+saat (ISO). Paraya/derslere dokunmaz.
+    function planKaydet() {
+      var o = ogrenciler[duzenleIndex];
+      if (!o) return;
+
+      // Seçilen günler (JS getDay: 0=Paz .. 6=Cmt)
+      var secili = [];
+      var secilenDugmeler = planGunlerKutu.querySelectorAll(".plan-gun.secili");
+      for (var i = 0; i < secilenDugmeler.length; i++) {
+        secili.push(Number(secilenDugmeler[i].getAttribute("data-gun")));
+      }
+      if (secili.length === 0) { planUyariGoster("Lütfen en az bir gün seç."); return; }
+
+      var saatMetin = planSaat.value; // "HH:MM"
+      if (!saatMetin || saatMetin.indexOf(":") === -1) { planUyariGoster("Lütfen bir saat seç."); return; }
+      var sp = saatMetin.split(":");
+      var sH = Number(sp[0]); var sM = Number(sp[1]);
+      if (isNaN(sH) || isNaN(sM)) { planUyariGoster("Lütfen geçerli bir saat seç."); return; }
+
+      var hafta = parseInt(planHafta.value, 10);
+      if (isNaN(hafta) || hafta < 1) { planUyariGoster("Lütfen geçerli bir hafta sayısı gir."); return; }
+
+      if (!Array.isArray(o.planliDersler)) o.planliDersler = [];
+      var simdi = new Date();
+      var toplamGun = hafta * 7; // tam N haftalık pencere: her seçili gün N kez gelir
+      for (var g = 0; g < toplamGun; g++) {
+        var t = new Date(simdi.getFullYear(), simdi.getMonth(), simdi.getDate() + g, sH, sM, 0, 0);
+        if (secili.indexOf(t.getDay()) !== -1) {
+          o.planliDersler.push(t.toISOString());
+        }
+      }
+
+      ogrencileriYaz(ogrenciler); // kalıcı kayıt (yedeğe de dahil olur)
+      planKapat();
+      gecmisDersleriCiz(); // ajandayı tazele
+      gecmisAc();          // sonucu görsün diye ajandayı aç
+    }
+
+    // Planlı dersleri iptal et — YAPILMIŞ dersler ve para ETKİLENMEZ
+    function planIptal() {
+      var o = ogrenciler[duzenleIndex];
+      if (!o || !Array.isArray(o.planliDersler) || o.planliDersler.length === 0) return;
+      if (!confirm("Planlı dersler iptal edilsin mi? Yapılmış dersler ve ödemeler etkilenmez.")) return;
+      o.planliDersler = [];
+      ogrencileriYaz(ogrenciler);
+      gecmisDersleriCiz();
+    }
+
+    document.getElementById("d-plan-ac").addEventListener("click", planAc);
+    dPlanIptal.addEventListener("click", planIptal);
+    document.getElementById("plan-vazgec").addEventListener("click", planKapat);
+    document.getElementById("plan-kaydet").addEventListener("click", planKaydet);
+    perdePlan.addEventListener("click", function (e) {
+      if (e.target === perdePlan) planKapat();
+    });
 
     // Geri alma butonlarını, olay var/yok durumuna göre etkin/pasif yap
     function geriAlButonlariniTazele() {
